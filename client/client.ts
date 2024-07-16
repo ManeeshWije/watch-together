@@ -1,13 +1,13 @@
 const socket = new WebSocket("ws://localhost:8080/ws");
 
 socket.binaryType = "arraybuffer";
-var videoPlayer = document.getElementById("videoPlayer") as HTMLVideoElement;
+var videoPlayer = document.getElementById("player") as HTMLVideoElement;
 
-socket.onopen = (e) => {
+socket.onopen = (_) => {
     console.log("Connected");
 };
 
-socket.onclose = (e) => {
+socket.onclose = (_) => {
     console.log("Disconnected");
 };
 

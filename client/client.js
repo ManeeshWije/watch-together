@@ -1,11 +1,11 @@
 // client.ts
 var socket = new WebSocket("ws://localhost:8080/ws");
 socket.binaryType = "arraybuffer";
-var videoPlayer = document.getElementById("videoPlayer");
-socket.onopen = (e) => {
+var videoPlayer = document.getElementById("player");
+socket.onopen = (_) => {
   console.log("Connected");
 };
-socket.onclose = (e) => {
+socket.onclose = (_) => {
   console.log("Disconnected");
 };
 socket.onmessage = (event) => {

@@ -64,6 +64,9 @@ async fn main() {
         .register_template_file("index", "./src/views/index.hbs")
         .expect("ERROR: could not register template file - index");
     handlebars
+        .register_template_file("header", "./src/views/header.hbs")
+        .expect("ERROR: could not register template file - header");
+    handlebars
         .register_template_file("login", "./src/views/login.hbs")
         .expect("ERROR: could not register template file - login");
     handlebars
