@@ -1,4 +1,4 @@
-// client.ts
+// client/client.ts
 var socket = new WebSocket("ws://localhost:8080/ws");
 socket.binaryType = "arraybuffer";
 var videoPlayer = document.getElementById("player");
