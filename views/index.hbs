@@ -2,6 +2,14 @@
 <html lang="en">
     {{> header }}
     <body class="bg-zinc-800">
-        {{> login }}
+        <div id="swap" class="flex flex-col justify-center items-center content-center">
+            {{#if Authenticated }}
+                {{> logout }}
+                {{> sidebar }}
+                {{> video }}
+            {{else}}
+                {{> login }}
+            {{/if}}
+        </div>
     </body>
 </html>

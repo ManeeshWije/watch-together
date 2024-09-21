@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/aymerick/raymond"
 	"github.com/joho/godotenv"
@@ -58,24 +59,134 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
 }
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	RenderTemplate(w, "index.hbs", nil)
-}
-
-func SubmitHandler(w http.ResponseWriter, r *http.Request) {
-	passwordEnv, exists := os.LookupEnv("PASSWORD")
-	if !exists {
-		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
-			"Error": "No password set in the environment.",
+	// Check if the auth cookie exists
+	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
+	if !cookieExists {
+		RenderTemplate(w, "index.hbs", map[string]interface{}{
+			"Error": "No cookie env var set",
 		})
 		return
 	}
+	cookie, err := r.Cookie("auth")
+	if err == nil && cookie.Value == cookieVal {
+		// User is authenticated, redirect to /videos
+		http.Redirect(w, r, "/videos", http.StatusSeeOther)
+		return
+	}
 
+	// If no cookie, render the login page
+	RenderTemplate(w, "index.hbs", nil)
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// Clear the cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour), // Set expiration to the past to delete the cookie
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Redirect to the login page or render the login template
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func SubmitHandler(w http.ResponseWriter, r *http.Request) {
+	passwordEnv, passExists := os.LookupEnv("PASSWORD")
+	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
+	if !cookieExists {
+		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
+			"Error": "No cookie env var set",
+		})
+		return
+	}
+	if !passExists {
+		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
+			"Error": "No password env var set",
+		})
+		return
+	}
 	if passwordEnv == r.FormValue("password") {
-		RenderTemplate(w, "partials/video.hbs", nil)
+		http.SetCookie(w, &http.Cookie{
+			Name:     "auth",
+			Value:    cookieVal,
+			Expires:  time.Now().Add(24 * time.Hour),
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		http.Redirect(w, r, "/videos", http.StatusSeeOther)
 	} else {
 		// Wrong password, send a 200 status but indicate the error in the response
 		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
 			"Error": "Incorrect password.",
 		})
 	}
+}
+
+func ListVideosHandler(w http.ResponseWriter, r *http.Request) {
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+	objects, err := ListObjects(*s3Client, bucket)
+	if err != nil {
+		http.Error(w, "Failed to list videos", http.StatusInternalServerError)
+		return
+	}
+
+	RenderTemplate(w, "index.hbs", map[string]interface{}{
+		"Authenticated": checkCookie(r),
+		"objects":       objects,
+	})
+}
+
+// Handler to fetch and return a specific video from S3
+func FetchVideoHandler(w http.ResponseWriter, r *http.Request) {
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "s3 bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+
+	videoKey := r.PathValue("videoKey")
+	if videoKey == "" {
+		http.Error(w, "Missing video key", http.StatusBadRequest)
+		return
+	}
+
+	videoBytes, err := GetObject(*s3Client, bucket, &videoKey)
+	if err != nil {
+		http.Error(w, "Failed to fetch video", http.StatusInternalServerError)
+		return
+	}
+
+	// Return video bytes as a response
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Write(videoBytes)
+}
+
+func checkCookie(r *http.Request) bool {
+	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
+	if !cookieExists {
+		return false
+	}
+
+	cookie, err := r.Cookie("auth")
+	if err == nil && cookie.Value == cookieVal {
+		return true
+	}
+
+	return false
 }

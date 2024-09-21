@@ -21,3 +21,9 @@
 
 -   Since this project uses TailwindCSS for styling, you will have to generate the `dist/output.css` file either once or in watch mode during development
     -   Simply run `npx tailwindcss -i ./client/input.css -o ./dist/output.css --watch`
+
+# TODO
+
+-   [ ] Add spinner when clicking on video
+-   [ ] Protect API endpoints
+-   [ ] Overall refactor some code paths

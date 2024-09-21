@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -58,22 +60,16 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Client Connected")
 
-	// Read video file
-	bytes, err := utils.FetchVideo()
+	s3Client, err := utils.CreateS3Client()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
-	// Send video as binary message
-	err = ws.WriteMessage(websocket.BinaryMessage, bytes)
-	if err != nil {
-		log.Println(err)
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		log.Println("Bucket does not exist")
 		return
 	}
-
-	log.Println("Video sent to client")
-
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
@@ -82,6 +78,35 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if string(message) == "PLAY" || string(message) == "PAUSE" {
+			broadcastMessage(string(message))
+		}
+		var msg struct {
+			Type string  `json:"type"`
+			Key  *string `json:"key"`
+		}
+
+		err = json.Unmarshal(message, &msg)
+		if err != nil {
+			log.Println("Error unmarshaling message:", err)
+			continue
+		}
+
+		if msg.Type == "VIDEO_KEY" {
+			log.Printf("Received video key: %s", *msg.Key)
+			bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			// Send video as binary message
+			err = ws.WriteMessage(websocket.BinaryMessage, bytes)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			log.Println("Video sent to client")
+		} else if string(message) == "PLAY" || string(message) == "PAUSE" {
 			broadcastMessage(string(message))
 		}
 	}
@@ -105,7 +130,9 @@ func setupRoutes() {
 
 	http.Handle("/", LogMiddleware(http.HandlerFunc(utils.IndexHandler)))
 	http.Handle("/submit", LogMiddleware(http.HandlerFunc(utils.SubmitHandler)))
+	http.Handle("/logout", LogMiddleware(http.HandlerFunc(utils.LogoutHandler)))
 	http.Handle("/ws", LogMiddleware(http.HandlerFunc(wsEndpoint)))
+	http.Handle("/videos", LogMiddleware(http.HandlerFunc(utils.ListVideosHandler)))
 }
 
 func main() {
