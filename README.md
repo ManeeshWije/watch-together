@@ -9,11 +9,19 @@
 
 -   These env vars must be set before running the command below
     -   export AWS_URL=
+        -   For accessing S3 bucket
     -   export AWS_ACCESS_KEY_ID=
+        -   self-explanatory
     -   export AWS_REGION=
+        -   Your S3 region
     -   export AWS_SECRET_ACCESS_KEY=
+        -   self-explanatory
     -   export AWS_S3_BUCKET=
+        -   For accessing bucket that contains video files
     -   export PASSWORD=
+        -   Password to get into the video library
+    -   export COOKIE_VAL=
+        -   Cookie value you want to be set which the app will look for upon each request
 -   `go run main.go` will run the Go backend
 -   This project also uses [air](https://github.com/air-verse/air) for hot reloading
 
