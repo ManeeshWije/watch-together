@@ -1,9 +1,25 @@
-if (!window.socket) {
+function sendVideoKey(videoKey) {
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "VIDEO_KEY", key: videoKey }));
+    } else {
+        console.error(
+            "WebSocket is not open. Ready state: " + socket.readyState,
+        );
+    }
+}
+
+if (!window.socket && document.getElementById("player")) {
     const socket = new WebSocket("ws://localhost:8080/ws");
     window.socket = socket;
 
     socket.binaryType = "arraybuffer";
-    var videoPlayer = document.getElementById("player");
+    let videoPlayer = document.getElementById("player");
+
+    if (!videoPlayer) {
+        console.warn(
+            "videoPlayer element not found, but probably because you haven't clicked a video yet",
+        );
+    }
 
     socket.onopen = (_) => {
         console.log("Connected");

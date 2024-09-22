@@ -147,36 +147,6 @@ func ListVideosHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Handler to fetch and return a specific video from S3
-func FetchVideoHandler(w http.ResponseWriter, r *http.Request) {
-	s3Client, err := CreateS3Client()
-	if err != nil {
-		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
-		return
-	}
-	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
-	if !exists {
-		http.Error(w, "s3 bucket env var not set", http.StatusInternalServerError)
-		return
-	}
-
-	videoKey := r.PathValue("videoKey")
-	if videoKey == "" {
-		http.Error(w, "Missing video key", http.StatusBadRequest)
-		return
-	}
-
-	videoBytes, err := GetObject(*s3Client, bucket, &videoKey)
-	if err != nil {
-		http.Error(w, "Failed to fetch video", http.StatusInternalServerError)
-		return
-	}
-
-	// Return video bytes as a response
-	w.Header().Set("Content-Type", "video/mp4")
-	w.Write(videoBytes)
-}
-
 func checkCookie(r *http.Request) bool {
 	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
 	if !cookieExists {

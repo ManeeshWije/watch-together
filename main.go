@@ -12,9 +12,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var msg struct {
+	Type string  `json:"type"`
+	Key  *string `json:"key"`
+}
+
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
+	ReadBufferSize:  8192,
+	WriteBufferSize: 8192,
 }
 
 var clients = make([]*websocket.Conn, 0)
@@ -79,35 +84,31 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 		}
 		if string(message) == "PLAY" || string(message) == "PAUSE" {
 			broadcastMessage(string(message))
-		}
-		var msg struct {
-			Type string  `json:"type"`
-			Key  *string `json:"key"`
-		}
-
-		err = json.Unmarshal(message, &msg)
-		if err != nil {
-			log.Println("Error unmarshaling message:", err)
-			continue
-		}
-
-		if msg.Type == "VIDEO_KEY" {
-			log.Printf("Received video key: %s", *msg.Key)
-			bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
+		} else {
+			err = json.Unmarshal(message, &msg)
 			if err != nil {
-				log.Println(err)
-				return
-			}
-			// Send video as binary message
-			err = ws.WriteMessage(websocket.BinaryMessage, bytes)
-			if err != nil {
-				log.Println(err)
-				return
+				log.Println("Error unmarshaling message:", err)
+				continue
 			}
 
-			log.Println("Video sent to client")
-		} else if string(message) == "PLAY" || string(message) == "PAUSE" {
-			broadcastMessage(string(message))
+			if msg.Type == "VIDEO_KEY" {
+				log.Printf("Received video key: %s", *msg.Key)
+				bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				// Send video as binary message
+				err = ws.WriteMessage(websocket.BinaryMessage, bytes)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+
+				log.Println("Video sent to client")
+			} else if string(message) == "PLAY" || string(message) == "PAUSE" {
+				broadcastMessage(string(message))
+			}
 		}
 	}
 }
