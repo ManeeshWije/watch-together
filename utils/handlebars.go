@@ -59,23 +59,13 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
 }
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	// Check if the auth cookie exists
-	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
-	if !cookieExists {
-		RenderTemplate(w, "index.hbs", map[string]interface{}{
-			"Error": "No cookie env var set",
-		})
-		return
-	}
-	cookie, err := r.Cookie("auth")
-	if err == nil && cookie.Value == cookieVal {
+    if CheckCookie(r) {
 		// User is authenticated, redirect to /videos
 		http.Redirect(w, r, "/videos", http.StatusSeeOther)
-		return
-	}
-
-	// If no cookie, render the login page
-	RenderTemplate(w, "index.hbs", nil)
+    } else {
+        // If no cookie, render the login page
+        RenderTemplate(w, "index.hbs", nil)
+    }
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -142,12 +132,12 @@ func ListVideosHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	RenderTemplate(w, "index.hbs", map[string]interface{}{
-		"Authenticated": checkCookie(r),
+		"Authenticated": CheckCookie(r),
 		"objects":       objects,
 	})
 }
 
-func checkCookie(r *http.Request) bool {
+func CheckCookie(r *http.Request) bool {
 	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
 	if !cookieExists {
 		return false

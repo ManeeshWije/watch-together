@@ -1,5 +1,7 @@
 function sendVideoKey(videoKey) {
+    const spinner = document.getElementById("spinner");
     if (socket.readyState === WebSocket.OPEN) {
+        spinner.style.display = "block";
         socket.send(JSON.stringify({ type: "VIDEO_KEY", key: videoKey }));
     } else {
         console.error(
@@ -14,6 +16,7 @@ if (!window.socket && document.getElementById("player")) {
 
     socket.binaryType = "arraybuffer";
     let videoPlayer = document.getElementById("player");
+    const spinner = document.getElementById("spinner");
 
     if (!videoPlayer) {
         console.warn(
@@ -32,6 +35,7 @@ if (!window.socket && document.getElementById("player")) {
     socket.onmessage = (event) => {
         console.log(event);
         if (event.data instanceof ArrayBuffer) {
+            spinner.style.display = "none";
             let blob = new Blob([event.data], { type: "video/mp4" });
             console.log(blob);
             let videoURL = URL.createObjectURL(blob);
