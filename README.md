@@ -28,6 +28,6 @@
 ### Client
 
 -   Since this project uses TailwindCSS for styling, you will have to regenerate the `client/output.css` if working on styles
-    -   Simply run `npx tailwindcss -i ./client/input.css -o ./dist/output.css --minify --watch`
+    -   Simply run `npx tailwindcss -i ./client/input.css -o ./client/output.css --minify --watch`
     -   This will generate a minified CSS file and also watch for changes as you edit styles
 -   `client/client.js` contains client code where the Websocket gets created and messages are sent/received
