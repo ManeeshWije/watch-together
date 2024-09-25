@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 function sendVideoKey(videoKey) {
     const spinner = document.getElementById("spinner");
     if (socket.readyState === WebSocket.OPEN) {
@@ -11,7 +13,8 @@ function sendVideoKey(videoKey) {
 }
 
 if (!window.socket && document.getElementById("player")) {
-    const socket = new WebSocket("ws://localhost:8080/ws");
+    const url = process.env.PROD === 1 ? "ws://watch-together.up.railway.app:8080/ws" : "ws://localhost:8080/ws"
+    const socket = new WebSocket(url);
     window.socket = socket;
 
     socket.binaryType = "arraybuffer";
