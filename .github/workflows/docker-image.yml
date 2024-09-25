@@ -17,7 +17,7 @@ jobs:
     - name: Build Docker image
       working-directory: ./
         
-      run: docker build --tag maneeshwije/watch-together
+      run: docker build --tag maneeshwije/watch-together .
       
     - name: Log in to DockerHub
       run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
