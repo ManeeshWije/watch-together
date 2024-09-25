@@ -29,3 +29,4 @@ dist
 node_modules
 .env
 tmp
+watch-together
