@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import { config } from "dotenv";
 
 function sendVideoKey(videoKey) {
     const spinner = document.getElementById("spinner");
