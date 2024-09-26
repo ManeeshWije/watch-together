@@ -31,7 +31,8 @@
     -   Simply run `npx tailwindcss -i ./client/input.css -o ./client/output.css --minify --watch`
     -   This will generate a minified CSS file and also watch for changes as you edit styles
 -   `client/client.js` contains client code where the Websocket gets created and messages are sent/received
+-   To use localhost instead of prod url for Websocket creation, change `PROD = 0` in `header.hbs`
 
 ### TODO
 
-[ ] Fetch bytes of video faster (multi-thread it?)
+-   [ ] Fetch bytes of video faster (multi-thread it?)
