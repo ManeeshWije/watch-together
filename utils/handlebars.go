@@ -59,13 +59,13 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
 }
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-    if CheckCookie(r) {
+	if CheckCookie(r) {
 		// User is authenticated, redirect to /videos
 		http.Redirect(w, r, "/videos", http.StatusSeeOther)
-    } else {
-        // If no cookie, render the login page
-        RenderTemplate(w, "index.hbs", nil)
-    }
+	} else {
+		// If no cookie, render the login page
+		RenderTemplate(w, "index.hbs", nil)
+	}
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
