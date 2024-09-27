@@ -18,6 +18,7 @@ if (!window.socket && document.getElementById("player")) {
     socket.binaryType = "arraybuffer";
     let videoPlayer = document.getElementById("player");
     const spinner = document.getElementById("spinner");
+    let isSyncing = false;
 
     if (!videoPlayer) {
         console.warn(
@@ -35,16 +36,28 @@ if (!window.socket && document.getElementById("player")) {
 
     socket.onmessage = (event) => {
         console.log(event);
-        if (event.data instanceof ArrayBuffer) {
+        if (typeof event.data === "string" || event.data instanceof String) {
+            const message = event.data.split(":");
+            if (message[0] === "TIMESTAMP") {
+                if (!isSyncing) {
+                    isSyncing = true;
+                    const timestamp = parseFloat(message[1]);
+                    videoPlayer.currentTime = timestamp / 1000;
+                    setTimeout(() => {
+                        isSyncing = false;
+                    }, 500); // Re-enable after a short delay
+                }
+            } else if (message[0] === "PLAY") {
+                videoPlayer.play();
+            } else if (message[0] === "PAUSE") {
+                videoPlayer.pause();
+            }
+        } else if (event.data instanceof ArrayBuffer) {
             spinner.style.display = "none";
             let blob = new Blob([event.data], { type: "video/mp4" });
             console.log(blob);
             let videoURL = URL.createObjectURL(blob);
             videoPlayer.src = videoURL;
-        } else if (event.data === "PLAY") {
-            videoPlayer.play();
-        } else if (event.data === "PAUSE") {
-            videoPlayer.pause();
         } else {
             console.error("WTF");
         }
@@ -60,5 +73,12 @@ if (!window.socket && document.getElementById("player")) {
 
     videoPlayer.onpause = () => {
         socket.send("PAUSE");
+    };
+
+    videoPlayer.onseeked = () => {
+        if (!isSyncing) {
+            const timestampInMs = videoPlayer.currentTime * 1000;
+            socket.send(`TIMESTAMP:${timestampInMs}`);
+        }
     };
 }

@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,15 +27,17 @@ var upgrader = websocket.Upgrader{
 var clients = make([]*websocket.Conn, 0)
 var clientsMutex = &sync.Mutex{}
 
-func broadcastMessage(message string) {
+func broadcastMessage(sender *websocket.Conn, message string) {
 	clientsMutex.Lock()
 	defer clientsMutex.Unlock()
 	for _, client := range clients {
-		err := client.WriteMessage(websocket.TextMessage, []byte(message))
-		if err != nil {
-			log.Printf("Error broadcasting message to client: %v", err)
-			client.Close()
-			removeClient(client)
+		if client != sender {
+			err := client.WriteMessage(websocket.TextMessage, []byte(message))
+			if err != nil {
+				log.Printf("Error broadcasting message to client: %v", err)
+				client.Close()
+				removeClient(client)
+			}
 		}
 	}
 }
@@ -82,8 +86,8 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 			removeClient(ws)
 			break
 		}
-		if string(message) == "PLAY" || string(message) == "PAUSE" {
-			broadcastMessage(string(message))
+		if string(message) == "PLAY" || string(message) == "PAUSE" || strings.Contains(string(message), "TIMESTAMP") {
+			broadcastMessage(ws, string(message))
 		} else {
 			err = json.Unmarshal(message, &msg)
 			if err != nil {
@@ -106,8 +110,6 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 				}
 
 				log.Println("Video sent to client")
-			} else if string(message) == "PLAY" || string(message) == "PAUSE" {
-				broadcastMessage(string(message))
 			}
 		}
 	}
