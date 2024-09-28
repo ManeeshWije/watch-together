@@ -29,7 +29,7 @@ func ListObjects(s3Client s3.Client, bucket string) ([]*string, error) {
 	return objects, nil
 }
 
-func GetObject(s3Client s3.Client, bucket string, videoKey *string) ([]byte, error) {
+func GetObject(s3Client s3.Client, bucket string, videoKey *string) (<-chan []byte, error) {
 	// Call the GetObject API to retrieve the video content.
 	resp, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
@@ -38,14 +38,28 @@ func GetObject(s3Client s3.Client, bucket string, videoKey *string) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	videoContent, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	// make a channel and send chunks
+	chunkSize := 8192
+	chunks := make(chan []byte)
+	go func() {
+		defer resp.Body.Close()
+		defer close(chunks)
+		buf := make([]byte, chunkSize)
+		for {
+			n, err := resp.Body.Read(buf)
+			if err != nil && err != io.EOF {
+				log.Println("Error reading from s3", err)
+				return
+			}
+			if n == 0 {
+				break
+			}
+			chunks <- buf[:n]
+		}
+	}()
 
-	return videoContent, nil
+	return chunks, nil
 }
 
 func CreateS3Client() (*s3.Client, error) {

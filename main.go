@@ -96,16 +96,18 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 			if msg.Type == "VIDEO_KEY" {
 				log.Printf("Received video key: %s", *msg.Key)
-				bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
+				chunks, err := utils.GetObject(*s3Client, bucket, msg.Key)
 				if err != nil {
 					log.Println(err)
 					return
 				}
-				// Send video as binary message
-				err = ws.WriteMessage(websocket.BinaryMessage, bytes)
-				if err != nil {
-					log.Println(err)
-					return
+				// Stream each chunk to the client
+				for chunk := range chunks {
+					err = ws.WriteMessage(websocket.BinaryMessage, chunk)
+					if err != nil {
+						log.Println("Error sending chunk to client: ", err)
+						return
+					}
 				}
 
 				log.Println("Video sent to client")
