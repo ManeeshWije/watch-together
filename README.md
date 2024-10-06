@@ -3,6 +3,14 @@
 -   Allows a websocket connection (password protected) to stream videos to multiple clients with real time video controlling
 -   Lists videos from S3 bucket and allows user to choose one and have others connect to the same video "room"
 
+# Screenshots
+
+![login](./screenshots/login.png) 
+
+![home](./screenshots/home.png) 
+
+![video](./screenshots/video.png) 
+
 # Developing
 
 ### Server
