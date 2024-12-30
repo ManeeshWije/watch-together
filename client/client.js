@@ -12,7 +12,7 @@ function sendVideoKey(videoKey) {
 
 if (!window.socket && document.getElementById("player")) {
     // const socket = new WebSocket("ws://localhost:8080/ws");
-    const socket = new WebSocket("ws://watch-together.up.railway.app/ws");
+    const socket = new WebSocket("wss://watch-together.up.railway.app/ws");
     window.socket = socket;
 
     socket.binaryType = "arraybuffer";
@@ -64,7 +64,7 @@ if (!window.socket && document.getElementById("player")) {
     };
 
     socket.onerror = (e) => {
-        console.log(`Error: ${e}`);
+        console.log(`Error: ${JSON.stringify(e)}`);
     };
 
     videoPlayer.onplay = () => {

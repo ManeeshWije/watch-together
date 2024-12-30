@@ -21,6 +21,9 @@ var msg struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
+	CheckOrigin: func(r *http.Request) bool {
+		return r.Host == "localhost:8080" || r.Host == "watch-together.up.railway.app"
+	},
 }
 
 var clients = make([]*websocket.Conn, 0)
