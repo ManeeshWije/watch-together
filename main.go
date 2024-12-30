@@ -125,11 +125,7 @@ func LogMiddleware(next http.Handler) http.Handler {
 
 func setupRoutes() {
 	clientfs := http.FileServer(http.Dir("client"))
-	distfs := http.FileServer(http.Dir("dist"))
-
 	http.Handle("/client/", LogMiddleware(http.StripPrefix("/client/", clientfs)))
-	http.Handle("/dist/", LogMiddleware(http.StripPrefix("/dist/", distfs)))
-
 	http.Handle("/", LogMiddleware(http.HandlerFunc(utils.IndexHandler)))
 	http.Handle("/submit", LogMiddleware(http.HandlerFunc(utils.SubmitHandler)))
 	http.Handle("/logout", LogMiddleware(http.HandlerFunc(utils.LogoutHandler)))

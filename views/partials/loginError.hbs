@@ -1,45 +1,39 @@
 <div
     id="login"
-    class="flex flex-col justify-center items-center content-center"
+    class="d-flex flex-column justify-content-center align-items-center"
 >
-    <div class="flex justify-center items-start w-full">
+    <div class="d-flex justify-content-center align-items-start w-100">
         <a
             href="https://github.com/ManeeshWije/watch-together"
-            class="block font-bold py-4 text-white w-fit relative after:block after:content-[''] after:absolute after:h-[3px] after:bg-white after:w-full after:scale-x-0 hover:after:scale-x-100 after:transition after:duration-300 after:origin-center"
+            class="font-weight-bold py-4 text-white position-relative link-highlight"
         >
             Source Code
         </a>
     </div>
-    <h1 class="text-white py-4 text-4xl font-bold">Watch Together</h1>
-    <h3 class="text-white py-4">A simple way to watch videos in real time with
-        multiple connected clients</h3>
+    <h1 class="text-white py-4 display-4 fw-bold">Watch Together</h1>
+    <h3 class="text-white py-4 text-center">A simple way to watch videos in real
+        time with multiple connected clients</h3>
     <form
-        class="text-white bg-slate-300 shadow-md rounded px-8 pt-6 pb-8 mb-4"
+        class="text-dark bg-light shadow rounded px-4 pt-4 pb-4 mb-4"
         id="password-form"
         hx-post="/submit"
         hx-swap="outerHTML"
         hx-target="#login"
     >
-        <div class="mb-6">
-            <label
-                class="block text-gray-700 text-sm font-bold mb-2"
-                for="password"
-            >
+        <div class="mb-3">
+            <label class="form-label fw-bold" for="password">
                 Password
             </label>
             <div class="error-message">{{Error}}</div>
             <input
-                class="shadow appearance-none rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+                class="form-control"
                 id="password"
                 type="password"
                 name="password"
                 placeholder="******************"
             />
         </div>
-        <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            type="submit"
-        >
+        <button class="btn btn-primary btn-block fw-bold" type="submit">
             Enter
         </button>
     </form>
