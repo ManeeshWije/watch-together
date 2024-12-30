@@ -35,8 +35,7 @@
 
 ### Client
 
--
-- To use localhost instead of prod url for Websocket creation, change `PROD = 0` in `header.hbs` (make sure to also use localhost inside `client.js`)
+- To use localhost instead of prod url for Websocket creation, change url in `client.js`
 
 ### TODO
 
