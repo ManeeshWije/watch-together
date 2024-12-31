@@ -40,6 +40,7 @@
 ### TODO
 
 - [ ] Split video into chunks and send each chunk with an accurate progress bar
+    - Or, try streaming video instead of full client download
 - [ ] Add real time chat on the side and allow users to sign in via oAuth
     - Can use user info for chatting
     - Chat messages are persisted on different videos
