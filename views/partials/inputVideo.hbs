@@ -1,0 +1,26 @@
+<form id="video-form">
+    <div class="mb-3">
+        <label for="video-url" class="form-label">Add Video URL</label>
+        <input
+            type="text"
+            class="form-control"
+            id="video-url"
+            aria-describedby="video-url"
+        />
+    </div>
+    <div class="text-center">
+        <button type="submit" class="btn btn-success">Add</button>
+        <div id="download-container" style="display:none; margin-top: 10px;">
+            <p>Downloading...</p>
+        </div>
+        <div id="progress-container" style="display:none; margin-top: 10px;">
+            <label for="progress" class="form-label">Uploading...</label>
+            <progress
+                id="progress"
+                value="0"
+                max="100"
+                style="width: 100%;"
+            ></progress>
+        </div>
+    </div>
+</form>

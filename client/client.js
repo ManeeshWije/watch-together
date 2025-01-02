@@ -11,8 +11,8 @@ function sendVideoKey(videoKey) {
 }
 
 if (!window.socket && document.getElementById("player")) {
-    // const socket = new WebSocket("ws://localhost:8080/ws");
-    const socket = new WebSocket("wss://watch-together.up.railway.app/ws");
+    const socket = new WebSocket("ws://localhost:8080/ws");
+    //const socket = new WebSocket("wss://watch-together.up.railway.app/ws");
     window.socket = socket;
 
     socket.binaryType = "arraybuffer";
@@ -36,6 +36,9 @@ if (!window.socket && document.getElementById("player")) {
 
     socket.onmessage = (event) => {
         console.log(event);
+        const progressElement = document.getElementById("progress");
+        const progressContainer = document.getElementById("progress-container");
+        const downloadElement = document.getElementById("download-container");
         if (typeof event.data === "string" || event.data instanceof String) {
             const message = event.data.split(":");
             if (message[0] === "TIMESTAMP") {
@@ -51,6 +54,17 @@ if (!window.socket && document.getElementById("player")) {
                 videoPlayer.play();
             } else if (message[0] === "PAUSE") {
                 videoPlayer.pause();
+            } else if (message[0] === "Progress") {
+                progressContainer.style.display = "block";
+                progressElement.value = parseFloat(message[1]);
+            } else if (message[0] === "RELOAD") {
+                location.reload();
+            } else if (message[0] === "DOWNLOADING") {
+                progressContainer.style.display = "none";
+                downloadElement.style.display = "block";
+            } else if (message[0] === "DOWNLOADED") {
+                progressContainer.style.display = "none";
+                downloadElement.style.display = "none";
             }
         } else if (event.data instanceof ArrayBuffer) {
             spinner.style.display = "none";
@@ -61,6 +75,24 @@ if (!window.socket && document.getElementById("player")) {
         } else {
             console.error("WTF");
         }
+    };
+
+    // Form submission handler
+    document
+        .getElementById("video-form")
+        .addEventListener("submit", (event) => {
+            event.preventDefault();
+            const videoURL = document.getElementById("video-url").value;
+
+            if (videoURL) {
+                socket.send(
+                    JSON.stringify({ type: "FETCH_VIDEO", key: videoURL }),
+                );
+            }
+        });
+
+    deleteObject = (title) => {
+        socket.send(JSON.stringify({ type: "DELETE", key: title }));
     };
 
     socket.onerror = (e) => {

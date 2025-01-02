@@ -1,10 +1,22 @@
 <div class="d-flex flex-column p-4 gap-3">
+    {{> inputVideo }}
     {{#each objects}}
-        <button
-            onclick="sendVideoKey('{{this}}')"
-            ontouchstart="sendVideoKey('{{this}}')"
-            class="btn btn-primary fw-bold"
-            id="video-list-{{this}}"
-        >{{this}}</button>
+        <div class="d-flex align-items-center gap-2">
+            <button
+                onclick="sendVideoKey('{{this}}')"
+                ontouchstart="sendVideoKey('{{this}}')"
+                class="btn btn-primary fw-bold flex-grow-1"
+                id="video-list-{{this}}"
+            >
+                {{this}}
+            </button>
+            <button
+                onclick="deleteObject('{{this}}')"
+                class="btn btn-danger"
+                aria-label="Delete {{this}}"
+            >
+                X
+            </button>
+        </div>
     {{/each}}
 </div>

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ManeeshWije/watch-together/utils"
 	"github.com/gorilla/websocket"
+	"github.com/kkdai/youtube/v2"
 )
 
 var msg struct {
@@ -72,6 +74,8 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("Client Connected")
 
 	s3Client, err := utils.CreateS3Client()
+	ytClient := youtube.Client{}
+
 	if err != nil {
 		log.Println(err)
 		return
@@ -97,7 +101,8 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			if msg.Type == "VIDEO_KEY" {
+			switch msg.Type {
+			case "VIDEO_KEY":
 				log.Printf("Received video key: %s", *msg.Key)
 				bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
 				if err != nil {
@@ -110,8 +115,37 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 					log.Println(err)
 					return
 				}
-
 				log.Println("Video sent to client")
+			case "FETCH_VIDEO":
+				if msg.Key != nil {
+					videoURL := *msg.Key
+					videoID, err := utils.ExtractVideoID(videoURL)
+					if err != nil {
+						log.Println("ERROR: Could not parse out videoID", err)
+					}
+
+					video, err := utils.GetVideoMetadata(ytClient, videoID)
+					if err != nil {
+						log.Println("ERROR: Could not fetch youtube video title", err)
+					}
+
+					err = utils.StreamToS3(ytClient, video, bucket, fmt.Sprintf("%s.mp4", video.Title), *s3Client, ws)
+					if err != nil {
+						log.Println("Error uploading video to S3:", err)
+					}
+				}
+			case "DELETE":
+				if msg.Key != nil {
+					videoTitle := *msg.Key
+					log.Printf("Deleting %s...", videoTitle)
+
+					err := utils.DeleteObject(*s3Client, bucket, videoTitle, ws)
+					if err != nil {
+						log.Println("Error deleteing video from S3:", err)
+					}
+				}
+			default:
+				log.Printf("Unhandled message type: %s", msg.Type)
 			}
 		}
 	}
