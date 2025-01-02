@@ -11,7 +11,9 @@ RUN go build
 FROM alpine:3.18
 
 # Install any necessary packages, like certificates
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache \
+    ca-certificates \
+    ffmpeg
 
 WORKDIR /app
 
