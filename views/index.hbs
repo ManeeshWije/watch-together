@@ -1,8 +1,13 @@
 <!doctype html>
 <html lang="en">
 {{> header }}
-<body class="bg-dark text-white">
-    <div id="swap" class="d-flex flex-column justify-content-center align-items-center">
+<body id="swap" class="bg-dark text-white">
+    {{#if Authenticated }}
+        <div class="users-section">
+            {{> users }}
+        </div>
+    {{/if}}
+    <div id="" class="d-flex flex-column justify-content-center align-items-center">
         <a href="https://github.com/ManeeshWije/watch-together" class="text-white py-4">
             Source Code
         </a>

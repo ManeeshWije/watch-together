@@ -11,8 +11,8 @@ function sendVideoKey(videoKey) {
 }
 
 if (!window.socket && document.getElementById("player")) {
-    // const socket = new WebSocket("ws://localhost:8080/ws");
-    const socket = new WebSocket("wss://watch-together.up.railway.app/ws");
+    const socket = new WebSocket("ws://localhost:8080/ws");
+    //const socket = new WebSocket("wss://watch-together.up.railway.app/ws");
     window.socket = socket;
 
     socket.binaryType = "arraybuffer";
@@ -77,7 +77,7 @@ if (!window.socket && document.getElementById("player")) {
         }
     };
 
-    // Form submission handler
+    // add video form submission handler
     document
         .getElementById("video-form")
         .addEventListener("submit", (event) => {

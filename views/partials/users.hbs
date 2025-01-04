@@ -1,0 +1,14 @@
+<div class="container p-4">
+    <h3>Connected Users</h3>
+    <table class="table table-striped" id="users-table">
+        <tbody hx-get="/list-users" hx-trigger="load, every 5s" hx-swap="innerHTML">
+            {{#if usernames}}
+                {{#each (split usernames ", ")}}
+                    <tr>
+                        <td>{{this}}</td>
+                    </tr>
+                {{/each}}
+            {{/if}}
+        </tbody>
+    </table>
+</div>

@@ -32,3 +32,8 @@ body {
     left: 0;
     z-index: 10;
 }
+
+.users-section {
+    margin-top: 20px;
+    margin-left: 10px;
+}

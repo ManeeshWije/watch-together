@@ -1,24 +1,23 @@
 package utils
 
 import (
+	"database/sql"
+	// "encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ManeeshWije/watch-together/db"
+	"github.com/ManeeshWije/watch-together/websocketmanager"
 	"github.com/aymerick/raymond"
-	"github.com/joho/godotenv"
+	"github.com/google/uuid"
 )
 
 var once sync.Once
-
-func Init() {
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
-	}
-}
 
 func registerPartials() {
 	partials, err := os.ReadDir("views/partials")
@@ -58,8 +57,9 @@ func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
 	w.Write([]byte(result))
 }
 
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	if CheckCookie(r) {
+func IndexHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	isAuthenticated, _ := VerifySession(dbConn, r)
+	if isAuthenticated {
 		// User is authenticated, redirect to /videos
 		http.Redirect(w, r, "/videos", http.StatusSeeOther)
 	} else {
@@ -68,85 +68,116 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// Clear the cookie
+func LogoutHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("auth")
+	if err != nil {
+		http.Error(w, "No auth cookie found", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID, err := uuid.Parse(cookie.Value)
+	if err != nil {
+		http.Error(w, "Invalid auth cookie value", http.StatusUnauthorized)
+		return
+	}
+
+	// Close the WebSocket connection
+	websocketmanager.RemoveConnection(sessionID)
+
+	// Delete the session from the database
+	err = db.DeleteUserSessionByToken(dbConn, sessionID)
+	if err != nil {
+		log.Printf("Error deleting user session: %v", err)
+		http.Error(w, "Error logging out", http.StatusInternalServerError)
+		return
+	}
+
+	// Clear the auth cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth",
 		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour), // Set expiration to the past to delete the cookie
+		Expires:  time.Now().UTC().Add(-1 * time.Hour),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
 
-	// Redirect to the login page or render the login template
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func SubmitHandler(w http.ResponseWriter, r *http.Request) {
-	passwordEnv, passExists := os.LookupEnv("PASSWORD")
-	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
-	if !cookieExists {
-		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
-			"Error": "No cookie env var set",
-		})
-		return
-	}
-	if !passExists {
-		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
-			"Error": "No password env var set",
-		})
-		return
-	}
-	if passwordEnv == r.FormValue("password") {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "auth",
-			Value:    cookieVal,
-			Expires:  time.Now().Add(24 * time.Hour),
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		})
-		http.Redirect(w, r, "/videos", http.StatusSeeOther)
-	} else {
-		// Wrong password, send a 200 status but indicate the error in the response
-		RenderTemplate(w, "partials/loginError.hbs", map[string]interface{}{
-			"Error": "Incorrect password.",
+func ListVideosHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	isAuthenticated, _ := VerifySession(dbConn, r)
+	if isAuthenticated {
+		s3Client, err := CreateS3Client()
+		if err != nil {
+			http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+			return
+		}
+		bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+		if !exists {
+			http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+			return
+		}
+		objects, err := ListObjects(*s3Client, bucket)
+		if err != nil {
+			http.Error(w, "Failed to list videos", http.StatusInternalServerError)
+			return
+		}
+
+		RenderTemplate(w, "index.hbs", map[string]interface{}{
+			"Authenticated": isAuthenticated,
+			"objects":       objects,
 		})
 	}
 }
 
-func ListVideosHandler(w http.ResponseWriter, r *http.Request) {
-	s3Client, err := CreateS3Client()
-	if err != nil {
-		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
-		return
-	}
-	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
-	if !exists {
-		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
-		return
-	}
-	objects, err := ListObjects(*s3Client, bucket)
-	if err != nil {
-		http.Error(w, "Failed to list videos", http.StatusInternalServerError)
-		return
+func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
+	conns := websocketmanager.ListConnections()
+
+	usernames := []string{}
+	for _, conn := range conns {
+		usernames = append(usernames, conn.Username)
 	}
 
-	RenderTemplate(w, "index.hbs", map[string]interface{}{
-		"Authenticated": CheckCookie(r),
-		"objects":       objects,
-	})
+	usernamesString := strings.Join(usernames, ", ")
+
+	log.Println(usernamesString)
+
+	_, err := w.Write([]byte(usernamesString))
+	if err != nil {
+		http.Error(w, "Failed to send users list", http.StatusInternalServerError)
+		log.Println("Error sending users list:", err)
+	}
 }
 
-func CheckCookie(r *http.Request) bool {
-	cookieVal, cookieExists := os.LookupEnv("COOKIE_VAL")
-	if !cookieExists {
-		return false
-	}
+func AddVideoHandler(w http.ResponseWriter, r *http.Request) {
+	// if msg.Key != nil {
+	// 	videoURL := *msg.Key
+	// 	videoID, err := utils.ExtractVideoID(videoURL)
+	// 	if err != nil {
+	// 		log.Println("ERROR: Could not parse out videoID", err)
+	// 	}
+	//
+	// 	video, err := utils.GetVideoMetadata(ytClient, videoID)
+	// 	if err != nil {
+	// 		log.Println("ERROR: Could not fetch youtube video title", err)
+	// 	}
+	//
+	// 	err = utils.StreamToS3(ytClient, video, bucket, fmt.Sprintf("%s.mp4", video.Title), *s3Client, ws)
+	// 	if err != nil {
+	// 		log.Println("Error uploading video to S3:", err)
+	// 	}
+	// }
+}
 
-	cookie, err := r.Cookie("auth")
-	if err == nil && cookie.Value == cookieVal {
-		return true
-	}
-
-	return false
+func DeleteVideoHandler(w http.ResponseWriter, r *http.Request) {
+	// 	if msg.Key != nil {
+	// 		videoTitle := *msg.Key
+	// 		log.Printf("Deleting %s...", videoTitle)
+	//
+	// 		err := utils.DeleteObject(*s3Client, bucket, videoTitle, ws)
+	// 		if err != nil {
+	// 			log.Println("Error deleteing video from S3:", err)
+	// 		}
+	// 	}
 }

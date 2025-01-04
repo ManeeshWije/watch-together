@@ -15,27 +15,10 @@
         time with multiple connected clients</h3>
     <form
         class="text-dark bg-light shadow rounded px-4 pt-4 pb-4 mb-4"
-        id="password-form"
-        hx-post="/submit"
+        hx-post="/auth/google/login"
         hx-swap="outerHTML"
         hx-target="#login"
     >
-        <div class="mb-3">
-            <label class="form-label fw-bold" for="password">
-                Password
-            </label>
-            <div class="error-message">{{Error}}</div>
-            <input
-                class="form-control"
-                id="password"
-                type="password"
-                name="password"
-                placeholder="******************"
-            />
-        </div>
-        <button class="btn btn-primary btn-block fw-bold" type="submit">
-            Enter
-        </button>
     </form>
     {{> footer}}
 </div>
