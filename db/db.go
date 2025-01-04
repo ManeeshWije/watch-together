@@ -12,7 +12,7 @@ import (
 )
 
 func Connect() *sql.DB {
-	db, err := sql.Open("postgres", os.Getenv("DB_URL"))
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_PUBLIC_URL"))
 	if err != nil {
 		panic(err)
 	}
@@ -29,7 +29,7 @@ func Connect() *sql.DB {
 }
 
 func Migrate() {
-	m, err := migrate.New("file://db/migrations", os.Getenv("DB_URL"))
+	m, err := migrate.New("file://db/migrations", os.Getenv("DATABASE_PUBLIC_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}

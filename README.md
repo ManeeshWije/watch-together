@@ -17,7 +17,7 @@
     - export AWS_REGION=
     - export AWS_SECRET_ACCESS_KEY=
     - export AWS_S3_BUCKET=
-    - export DB_URL=
+    - export DATABASE_PUBLIC_URL=
     - export CLIENT_ID=
     - export CLIENT_SECRET=
 - `air` will run the server in watch mode, or simply run the server using `go run main.go`
