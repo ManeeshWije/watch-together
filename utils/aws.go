@@ -148,15 +148,6 @@ func UploadFile(s3Client s3.Client, bucket string, videoKey *string, data io.Rea
 		return err
 	}
 
-	// Send reload message
-	progressMessage := "RELOAD"
-	err = ws.WriteMessage(websocket.TextMessage, []byte(progressMessage))
-	if err != nil {
-		log.Println("Error sending reload message to client:", err)
-		return err
-	}
-
-	log.Printf("Successfully uploaded %s to bucket %s", *videoKey, bucket)
 	return nil
 }
 
@@ -182,14 +173,6 @@ func DeleteObject(s3Client s3.Client, bucket string, objectKey string, ws *webso
 		return err
 	}
 
-	// Send reload message
-	progressMessage := "RELOAD"
-	err = ws.WriteMessage(websocket.TextMessage, []byte(progressMessage))
-	if err != nil {
-		log.Println("Error sending reload message to client:", err)
-		return err
-	}
-	log.Printf("Successfully deleted object %s from bucket %s", objectKey, bucket)
 	return nil
 }
 

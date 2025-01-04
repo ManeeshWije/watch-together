@@ -97,7 +97,6 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	log.Println("Client Connected")
 
 	s3Client, err := utils.CreateS3Client()
-	// ytClient := youtube.Client{}
 
 	if err != nil {
 		log.Println(err)
@@ -183,8 +182,8 @@ func setupRoutes(dbConn *sql.DB) {
 	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, wsEndpoint))))
 	http.Handle("/videos", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.ListVideosHandler))))
 	http.Handle("/list-users", logMiddleware(authMiddleware(dbConn, http.HandlerFunc(utils.ListUsersHandler))))
-	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, http.HandlerFunc(utils.AddVideoHandler))))
-	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, http.HandlerFunc(utils.DeleteVideoHandler))))
+	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.AddVideoHandler))))
+	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.DeleteVideoHandler))))
 
 	http.Handle("/auth/google/login", logMiddleware(http.HandlerFunc(utils.OauthGoogleLogin)))
 	http.Handle("/auth/google/callback", logMiddleware(dbHandler(dbConn, utils.OauthGoogleCallback)))

@@ -2,9 +2,10 @@ package utils
 
 import (
 	"database/sql"
-	// "encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/ManeeshWije/watch-together/websocketmanager"
 	"github.com/aymerick/raymond"
 	"github.com/google/uuid"
+	"github.com/kkdai/youtube/v2"
 )
 
 var once sync.Once
@@ -63,7 +65,7 @@ func IndexHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		// User is authenticated, redirect to /videos
 		http.Redirect(w, r, "/videos", http.StatusSeeOther)
 	} else {
-		// If no cookie, render the login page
+		// If no cookie, render the login page without auth
 		RenderTemplate(w, "index.hbs", nil)
 	}
 }
@@ -107,28 +109,30 @@ func LogoutHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 func ListVideosHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	isAuthenticated, _ := VerifySession(dbConn, r)
-	if isAuthenticated {
-		s3Client, err := CreateS3Client()
-		if err != nil {
-			http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
-			return
-		}
-		bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
-		if !exists {
-			http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
-			return
-		}
-		objects, err := ListObjects(*s3Client, bucket)
-		if err != nil {
-			http.Error(w, "Failed to list videos", http.StatusInternalServerError)
-			return
-		}
-
-		RenderTemplate(w, "index.hbs", map[string]interface{}{
-			"Authenticated": isAuthenticated,
-			"objects":       objects,
-		})
+	if !isAuthenticated {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+	objects, err := ListObjects(*s3Client, bucket)
+	if err != nil {
+		http.Error(w, "Failed to list videos", http.StatusInternalServerError)
+		return
+	}
+
+	RenderTemplate(w, "index.hbs", map[string]interface{}{
+		"Authenticated": isAuthenticated,
+		"objects":       objects,
+	})
 }
 
 func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -148,34 +152,93 @@ func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AddVideoHandler(w http.ResponseWriter, r *http.Request) {
-	// if msg.Key != nil {
-	// 	videoURL := *msg.Key
-	// 	videoID, err := utils.ExtractVideoID(videoURL)
-	// 	if err != nil {
-	// 		log.Println("ERROR: Could not parse out videoID", err)
-	// 	}
-	//
-	// 	video, err := utils.GetVideoMetadata(ytClient, videoID)
-	// 	if err != nil {
-	// 		log.Println("ERROR: Could not fetch youtube video title", err)
-	// 	}
-	//
-	// 	err = utils.StreamToS3(ytClient, video, bucket, fmt.Sprintf("%s.mp4", video.Title), *s3Client, ws)
-	// 	if err != nil {
-	// 		log.Println("Error uploading video to S3:", err)
-	// 	}
-	// }
+func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	isAuthenticated, session := VerifySession(dbConn, r)
+	if !isAuthenticated {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	ytClient := youtube.Client{}
+	ws := websocketmanager.GetConnection(session.UUID)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	videoURL := r.FormValue("video-url")
+	if videoURL == "" {
+		http.Error(w, "Missing video URL", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received video URL: %s", videoURL)
+	videoID, err := ExtractVideoID(videoURL)
+	if err != nil {
+		log.Println("ERROR: Could not parse out videoID", err)
+	}
+	video, err := GetVideoMetadata(ytClient, videoID)
+	if err != nil {
+		log.Println("ERROR: Could not fetch youtube video title", err)
+	}
+
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+
+	err = StreamToS3(ytClient, video, bucket, fmt.Sprintf("%s.mp4", video.Title), *s3Client, ws)
+	if err != nil {
+		log.Println("Error uploading video to S3:", err)
+	}
+
+	w.Header().Set("HX-Refresh", "true")
 }
 
-func DeleteVideoHandler(w http.ResponseWriter, r *http.Request) {
-	// 	if msg.Key != nil {
-	// 		videoTitle := *msg.Key
-	// 		log.Printf("Deleting %s...", videoTitle)
-	//
-	// 		err := utils.DeleteObject(*s3Client, bucket, videoTitle, ws)
-	// 		if err != nil {
-	// 			log.Println("Error deleteing video from S3:", err)
-	// 		}
-	// 	}
+func DeleteVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	isAuthenticated, session := VerifySession(dbConn, r)
+	if !isAuthenticated {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ws := websocketmanager.GetConnection(session.UUID)
+
+	query := r.URL.Query()
+	videoTitle := query.Get("video-title")
+	if videoTitle == "" {
+		http.Error(w, "Missing video title", http.StatusBadRequest)
+		return
+	}
+
+	decodedTitle, err := url.QueryUnescape(videoTitle)
+	if err != nil {
+		http.Error(w, "Invalid video title encoding", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received video title: %s", decodedTitle)
+
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+
+	err = DeleteObject(*s3Client, bucket, videoTitle, ws)
+	if err != nil {
+		log.Println("Error deleteing video from S3:", err)
+	}
+	w.Header().Set("HX-Refresh", "true")
 }

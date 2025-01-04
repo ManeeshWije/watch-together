@@ -27,3 +27,9 @@
 - `npm install` to install tailwind
 - `npx tailwindcss -i ./client/input.css -o ./client/output.css --minify --watch` to generate styles in watch mode
 - `client.js` change websocket url to localhost when local server running
+
+# TODO
+
+- Add rate limiting on endpoints
+- Use `slog` and clean up inconsistencies of fmt and log
+- Chat system?

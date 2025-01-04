@@ -57,8 +57,6 @@ if (!window.socket && document.getElementById("player")) {
             } else if (message[0] === "Progress") {
                 progressContainer.style.display = "block";
                 progressElement.value = parseFloat(message[1]);
-            } else if (message[0] === "RELOAD") {
-                location.reload();
             } else if (message[0] === "DOWNLOADING") {
                 progressContainer.style.display = "none";
                 downloadElement.style.display = "block";
@@ -75,24 +73,6 @@ if (!window.socket && document.getElementById("player")) {
         } else {
             console.error("WTF");
         }
-    };
-
-    // add video form submission handler
-    document
-        .getElementById("video-form")
-        .addEventListener("submit", (event) => {
-            event.preventDefault();
-            const videoURL = document.getElementById("video-url").value;
-
-            if (videoURL) {
-                socket.send(
-                    JSON.stringify({ type: "FETCH_VIDEO", key: videoURL }),
-                );
-            }
-        });
-
-    deleteObject = (title) => {
-        socket.send(JSON.stringify({ type: "DELETE", key: title }));
     };
 
     socket.onerror = (e) => {
@@ -113,4 +93,28 @@ if (!window.socket && document.getElementById("player")) {
             socket.send(`TIMESTAMP:${timestampInMs}`);
         }
     };
+
+    document
+        .getElementById("toggle-users")
+        .addEventListener("click", function () {
+            const usersList = document.getElementById("users-list");
+            const button = this;
+            const isHidden = usersList.classList.contains("hidden");
+
+            if (isHidden) {
+                // Show the users list
+                usersList.classList.remove("hidden");
+                button.textContent = "Hide Connected Users";
+
+                // Make API call every time we show the list
+                htmx.ajax("GET", "/list-users", {
+                    target: "#users-list",
+                    swap: "innerHTML",
+                });
+            } else {
+                // Hide the users list
+                usersList.classList.add("hidden");
+                button.textContent = "Show Connected Users";
+            }
+        });
 }

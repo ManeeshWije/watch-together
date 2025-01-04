@@ -1,18 +1,20 @@
-<form id="video-form">
-    <div class="mb-4 w-full p-4">
-        <label for="video-url" class="block text-lg font-medium text-white">
-            Add Youtube Video URL
+<form id="video-form" hx-post="/add-video" hx-target="#objects">
+    <div class="mb-6 w-full p-4">
+        <label for="video-url" class="block text-lg font-medium text-gray-900 dark:text-white">
+            Add YouTube Video URL
         </label>
-        <div class="flex items-center gap-2 mt-2">
+        <div class="flex items-center gap-4 mt-2">
             <input
                 type="text"
-                class="block w-full rounded-lg border-gray-300 shadow-md focus:border-indigo-500 focus:ring-indigo-500 text-lg"
+                class="block w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 text-lg text-gray-900 placeholder-gray-500 shadow-sm dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:focus:ring-indigo-400 dark:focus:border-indigo-400"
                 id="video-url"
                 aria-describedby="video-url"
+                name="video-url"
+                placeholder="Enter video URL"
             />
             <button
                 type="submit"
-                class="bg-green-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-600 text-lg"
+                class="bg-gray-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-gray-700 text-lg transition duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 shadow-md"
             >
                 Add
             </button>
@@ -20,12 +22,12 @@
     </div>
     <div class="text-center">
         <div id="download-container" class="hidden mt-4">
-            <p class="text-sm text-white">Downloading...</p>
+            <p class="text-sm text-gray-900 dark:text-white">Downloading...</p>
         </div>
         <div id="progress-container" class="hidden mt-4">
             <label
                 for="progress"
-                class="block text-sm font-medium text-white"
+                class="block text-sm font-medium text-gray-900 dark:text-white"
             >
                 Uploading...
             </label>
@@ -33,7 +35,7 @@
                 id="progress"
                 value="0"
                 max="100"
-                class="w-full h-6 rounded border border-gray-300"
+                class="w-full h-6 rounded-lg border border-gray-300 bg-gray-100 dark:bg-gray-700 dark:border-gray-600"
             ></progress>
         </div>
     </div>
