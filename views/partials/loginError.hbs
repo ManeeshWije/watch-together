@@ -1,20 +1,21 @@
 <div
     id="login"
-    class="d-flex flex-column justify-content-center align-items-center"
+    class="flex flex-col justify-center items-center min-h-screen"
 >
-    <div class="d-flex justify-content-center align-items-start w-100">
+    <div class="flex justify-center items-start w-full">
         <a
             href="https://github.com/ManeeshWije/watch-together"
-            class="font-weight-bold py-4 text-white position-relative link-highlight"
+            class="font-bold py-4 text-white relative underline hover:text-gray-300"
         >
             Source Code
         </a>
     </div>
-    <h1 class="text-white py-4 display-4 fw-bold">Watch Together</h1>
-    <h3 class="text-white py-4 text-center">A simple way to watch videos in real
-        time with multiple connected clients</h3>
+    <h1 class="text-white py-4 text-4xl font-bold">Watch Together</h1>
+    <h3 class="text-white py-4 text-center text-lg">
+        A simple way to watch videos in real time with multiple connected clients
+    </h3>
     <form
-        class="text-dark bg-light shadow rounded px-4 pt-4 pb-4 mb-4"
+        class="text-gray-800 bg-white shadow-md rounded px-6 pt-4 pb-4 mb-4 w-full max-w-md"
         hx-post="/auth/google/login"
         hx-swap="outerHTML"
         hx-target="#login"

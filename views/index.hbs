@@ -1,14 +1,17 @@
 <!doctype html>
 <html lang="en">
 {{> header }}
-<body id="swap" class="bg-dark text-white">
+<body id="swap" class="bg-gray-800 text-white">
     {{#if Authenticated }}
-        <div class="users-section">
+        <div class="mt-5 ml-2">
             {{> users }}
         </div>
     {{/if}}
-    <div id="" class="d-flex flex-column justify-content-center align-items-center">
-        <a href="https://github.com/ManeeshWije/watch-together" class="text-white py-4">
+    <div class="flex flex-col justify-center items-center p-4">
+        <a
+            href="https://github.com/ManeeshWije/watch-together"
+            class="text-white hover:underline"
+        >
             Source Code
         </a>
         {{#if Authenticated }}
@@ -18,7 +21,7 @@
         {{else}}
             {{> login }}
         {{/if}}
-        {{> footer}}
+        {{> footer }}
     </div>
 </body>
 <script src="client/client.js"></script>

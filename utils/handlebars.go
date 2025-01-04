@@ -141,8 +141,6 @@ func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	usernamesString := strings.Join(usernames, ", ")
 
-	log.Println(usernamesString)
-
 	_, err := w.Write([]byte(usernamesString))
 	if err != nil {
 		http.Error(w, "Failed to send users list", http.StatusInternalServerError)
