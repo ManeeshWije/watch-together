@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ManeeshWije/watch-together/db"
+	"github.com/ManeeshWije/watch-together/ratelimiter"
 	"github.com/ManeeshWije/watch-together/utils"
 	"github.com/ManeeshWije/watch-together/websocketmanager"
 	"github.com/google/uuid"
@@ -173,20 +174,20 @@ func authMiddleware(dbConn *sql.DB, next http.Handler) http.Handler {
 	})
 }
 
-func setupRoutes(dbConn *sql.DB) {
+func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 	clientfs := http.FileServer(http.Dir("client"))
-	http.Handle("/client/", logMiddleware(http.StripPrefix("/client/", clientfs)))
-	http.Handle("/", logMiddleware(dbHandler(dbConn, utils.IndexHandler)))
-	http.Handle("/logout", logMiddleware(dbHandler(dbConn, utils.LogoutHandler)))
+	http.Handle("/client/", logMiddleware(rateLimiter.Middleware(http.StripPrefix("/client/", clientfs))))
+	http.Handle("/", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.IndexHandler))))
+	http.Handle("/logout", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.LogoutHandler))))
 
-	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, wsEndpoint))))
-	http.Handle("/videos", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.ListVideosHandler))))
-	http.Handle("/list-users", logMiddleware(authMiddleware(dbConn, http.HandlerFunc(utils.ListUsersHandler))))
-	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.AddVideoHandler))))
-	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, dbHandler(dbConn, utils.DeleteVideoHandler))))
+	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, wsEndpoint)))))
+	http.Handle("/videos", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.ListVideosHandler)))))
+	http.Handle("/list-users", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(http.HandlerFunc(utils.ListUsersHandler)))))
+	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.AddVideoHandler)))))
+	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.DeleteVideoHandler)))))
 
-	http.Handle("/auth/google/login", logMiddleware(http.HandlerFunc(utils.OauthGoogleLogin)))
-	http.Handle("/auth/google/callback", logMiddleware(dbHandler(dbConn, utils.OauthGoogleCallback)))
+	http.Handle("/auth/google/login", logMiddleware(rateLimiter.Middleware(http.HandlerFunc(utils.OauthGoogleLogin))))
+	http.Handle("/auth/google/callback", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.OauthGoogleCallback))))
 }
 
 func main() {
@@ -197,8 +198,9 @@ func main() {
 	dbConn := db.Connect()
 	defer dbConn.Close()
 	db.Migrate()
+	rateLimiter := ratelimiter.NewRateLimiter(5, 10)
 	utils.InitOAuthConfig()
-	setupRoutes(dbConn)
+	setupRoutes(dbConn, rateLimiter)
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
