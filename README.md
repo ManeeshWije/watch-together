@@ -5,7 +5,7 @@
 
 # Demo
 
-[![Demo](./media/thumb.jpg)](https://vimeo.com/1043507662?share=copy)
+[![Demo](./media/thumb.jpg)](https://vimeo.com/1043972987?share=copy#t=0)
 
 # Developing
 
@@ -30,6 +30,6 @@
 
 # TODO
 
-- Add rate limiting on endpoints
+- Reconnect logic
 - Use `slog` and clean up inconsistencies of fmt and log
 - Chat system?

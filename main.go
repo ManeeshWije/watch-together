@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ManeeshWije/watch-together/db"
@@ -31,35 +30,6 @@ var upgrader = websocket.Upgrader{
 		origin := r.Header.Get("Origin")
 		return origin == "http://localhost:8080" || origin == "https://watch-together.up.railway.app"
 	},
-}
-
-var clients = make([]*websocket.Conn, 0)
-var clientsMutex = &sync.Mutex{}
-
-func broadcastMessage(sender *websocket.Conn, message string) {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
-	for _, client := range clients {
-		if client != sender {
-			err := client.WriteMessage(websocket.TextMessage, []byte(message))
-			if err != nil {
-				log.Printf("Error broadcasting message to client: %v", err)
-				client.Close()
-				removeClient(client)
-			}
-		}
-	}
-}
-
-func removeClient(conn *websocket.Conn) {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
-	for i, client := range clients {
-		if client == conn {
-			clients = append(clients[:i], clients[i+1:]...)
-			break
-		}
-	}
 }
 
 func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -112,11 +82,11 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
 			log.Println(err)
-			removeClient(ws)
+			websocketmanager.RemoveConnection(sessionID)
 			break
 		}
 		if string(message) == "PLAY" || string(message) == "PAUSE" || strings.Contains(string(message), "TIMESTAMP") {
-			broadcastMessage(ws, string(message))
+			websocketmanager.BroadcastMessage(ws, string(message))
 		} else {
 			err = json.Unmarshal(message, &msg)
 			if err != nil {

@@ -69,3 +69,19 @@ func ListConnections() []*ConnectionMetadata {
 	}
 	return allConnections
 }
+
+func BroadcastMessage(sender *websocket.Conn, message string) {
+	connections := ListConnections()
+
+	// Broadcast to all connections except the sender
+	for _, connMetadata := range connections {
+		if connMetadata.Conn != sender {
+			err := connMetadata.Conn.WriteMessage(websocket.TextMessage, []byte(message))
+			if err != nil {
+				log.Printf("Error broadcasting message to client: %v", err)
+				connMetadata.Conn.Close()
+				RemoveConnection(connMetadata.SessionID)
+			}
+		}
+	}
+}
