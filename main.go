@@ -163,7 +163,7 @@ func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file")
 	}
 	dbConn := db.Connect()
 	defer dbConn.Close()
