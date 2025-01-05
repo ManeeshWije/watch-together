@@ -1,6 +1,15 @@
-<form id="video-form" hx-post="/add-video" hx-target="#objects" hx-target-403="#limit-exceeded">
+<form
+    id="video-form"
+    hx-post="/add-video"
+    hx-target="#objects"
+    hx-target-403="#limit-exceeded"
+    hx-target-400="#bad-request"
+>
     <div class="mb-6 w-full p-4">
-        <label for="video-url" class="block text-lg font-medium text-gray-900 dark:text-white">
+        <label
+            for="video-url"
+            class="block text-lg font-medium text-gray-900 dark:text-white"
+        >
             Add YouTube Video URL
         </label>
         <div class="flex items-center gap-4 mt-2">
@@ -19,6 +28,10 @@
                 Add
             </button>
         </div>
+    </div>
+    <div id="limit-exceeded" class="text-center text-red-400">
+    </div>
+    <div id="bad-request" class="text-center text-red-400">
     </div>
     <div class="text-center">
         <div id="download-container" class="hidden mt-4">
@@ -40,6 +53,3 @@
         </div>
     </div>
 </form>
-
-<div id="limit-exceeded" class="text-center">
-</div>

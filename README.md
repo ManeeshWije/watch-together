@@ -32,6 +32,7 @@
 # TODO
 
 - Bug when seeking, sends infinite play/pause messages
+- Make db source of truth for objects instead of S3, prevents list being called everytime in S3
 - Reconnect logic
 - Use `slog` and clean up inconsistencies of fmt and log
 - Chat system?

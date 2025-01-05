@@ -182,6 +182,8 @@ func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	videoID, err := ExtractVideoID(videoURL)
 	if err != nil {
 		log.Println("ERROR: Could not parse out videoID", err)
+		http.Error(w, "Could not parse out videoID", http.StatusBadRequest)
+		return
 	}
 	video, err := GetVideoMetadata(ytClient, videoID)
 	if err != nil {
