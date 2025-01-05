@@ -31,6 +31,7 @@
 
 # TODO
 
+- Bug when seeking, sends infinite play/pause messages
 - Reconnect logic
 - Use `slog` and clean up inconsistencies of fmt and log
 - Chat system?
