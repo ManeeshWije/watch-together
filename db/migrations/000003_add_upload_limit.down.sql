@@ -1,0 +1,5 @@
+ALTER TABLE users
+DROP COLUMN IF EXISTS num_uploads;
+
+ALTER TABLE users
+DROP COLUMN IF EXISTS is_admin;

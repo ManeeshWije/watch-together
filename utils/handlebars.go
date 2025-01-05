@@ -158,6 +158,12 @@ func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	canUpload, err := db.IncrementUploads(dbConn, session.UserUUID)
+	if !canUpload {
+		http.Error(w, "Upload limit exceeded", http.StatusForbidden)
+		return
+	}
+
 	ytClient := youtube.Client{}
 	ws := websocketmanager.GetConnection(session.UUID)
 

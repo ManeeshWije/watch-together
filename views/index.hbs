@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 {{> header }}
-<body id="swap" class="bg-gray-800 text-white">
+<body id="swap" hx-ext="response-targets" class="bg-gray-800 text-white">
     {{#if Authenticated }}
         <div class="mt-5 ml-2">
             {{> users }}

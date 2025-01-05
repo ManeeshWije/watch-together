@@ -1,4 +1,4 @@
-<form id="video-form" hx-post="/add-video" hx-target="#objects">
+<form id="video-form" hx-post="/add-video" hx-target="#objects" hx-target-403="#limit-exceeded">
     <div class="mb-6 w-full p-4">
         <label for="video-url" class="block text-lg font-medium text-gray-900 dark:text-white">
             Add YouTube Video URL
@@ -40,3 +40,6 @@
         </div>
     </div>
 </form>
+
+<div id="limit-exceeded" class="text-center">
+</div>

@@ -133,7 +133,7 @@ func createUserAndSession(dbConn *sql.DB, userInfo struct {
 }, w http.ResponseWriter) error {
 	userUUID := uuid.New()
 	createdAt := time.Now().UTC()
-	if err := db.CreateUser(dbConn, userUUID, userInfo.Name, userInfo.Email, createdAt); err != nil {
+	if err := db.CreateUser(dbConn, userUUID, userInfo.Name, userInfo.Email, createdAt, 0, false); err != nil {
 		return fmt.Errorf("could not create user: %w", err)
 	}
 	return createSession(dbConn, userUUID, w)
