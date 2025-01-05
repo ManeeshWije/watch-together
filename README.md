@@ -20,6 +20,7 @@
     - export DATABASE_PUBLIC_URL=
     - export CLIENT_ID=
     - export CLIENT_SECRET=
+    - export GOOGLE_REDIRECT_URL=
 - `air` will run the server in watch mode, or simply run the server using `go run main.go`
 
 ### Client
