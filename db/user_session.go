@@ -38,7 +38,7 @@ func CreateUserSession(db *sql.DB, uuid uuid.UUID, userUuid uuid.UUID, createdAt
 }
 
 func GetUserSession(db *sql.DB, userUuid uuid.UUID) (*UserSession, error) {
-    query := `SELECT uuid, user_uuid, created_at, expires_at FROM user_sessions WHERE user_uuid = $1 AND expires_at > $2`
+	query := `SELECT uuid, user_uuid, created_at, expires_at FROM user_sessions WHERE user_uuid = $1 AND expires_at > $2`
 	rows, err := db.Query(query, userUuid, time.Now().UTC())
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user sessions: %v", err)
@@ -104,6 +104,34 @@ func DeleteUserSessionByToken(db *sql.DB, token uuid.UUID) error {
 	if rowsAffected == 0 {
 		return fmt.Errorf("no session found with the provided token")
 	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	return nil
+}
+
+func DeleteExpiredSessions(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	query := `DELETE FROM user_sessions WHERE expires_at <= $1`
+
+	result, err := tx.Exec(query, time.Now().UTC())
+	if err != nil {
+		return fmt.Errorf("failed to delete expired sessions: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve rows affected: %v", err)
+	}
+
+	fmt.Printf("Deleted %d expired sessions\n", rowsAffected)
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %v", err)

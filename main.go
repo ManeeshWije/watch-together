@@ -118,6 +118,27 @@ func authMiddleware(dbConn *sql.DB, next http.Handler) http.Handler {
 	})
 }
 
+func dailyCleanup(dbConn *sql.DB) {
+	go func() {
+		for {
+			now := time.Now()
+			// Calculate the duration until the next midnight
+			nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+			duration := time.Until(nextMidnight)
+
+			// Wait until the next midnight
+			time.Sleep(duration)
+
+			// Run the DeleteExpiredSessions function
+			if err := db.DeleteExpiredSessions(dbConn); err != nil {
+				log.Printf("Error running DeleteExpiredSessions: %v", err)
+			} else {
+				log.Println("Successfully ran DeleteExpiredSessions")
+			}
+		}
+	}()
+}
+
 func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 	clientfs := http.FileServer(http.Dir("client"))
 	http.Handle("/client/", logMiddleware(rateLimiter.Middleware(http.StripPrefix("/client/", clientfs))))
@@ -146,6 +167,7 @@ func main() {
 	rateLimiter := ratelimiter.NewRateLimiter(5, 10)
 	utils.InitOAuthConfig()
 	setupRoutes(dbConn, rateLimiter)
+	dailyCleanup(dbConn)
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
