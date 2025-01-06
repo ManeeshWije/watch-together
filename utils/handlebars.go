@@ -16,6 +16,7 @@ import (
 	"github.com/ManeeshWije/watch-together/websocketmanager"
 	"github.com/aymerick/raymond"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/kkdai/youtube/v2"
 )
 
@@ -113,17 +114,7 @@ func ListVideosHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	s3Client, err := CreateS3Client()
-	if err != nil {
-		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
-		return
-	}
-	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
-	if !exists {
-		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
-		return
-	}
-	objects, err := ListObjects(*s3Client, bucket)
+	videos, err := db.ListVideos(dbConn)
 	if err != nil {
 		http.Error(w, "Failed to list videos", http.StatusInternalServerError)
 		return
@@ -131,7 +122,7 @@ func ListVideosHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	RenderTemplate(w, "index.hbs", map[string]interface{}{
 		"Authenticated": isAuthenticated,
-		"objects":       objects,
+		"videos":        videos,
 	})
 }
 
@@ -190,6 +181,12 @@ func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		log.Println("ERROR: Could not fetch youtube video title", err)
 	}
 
+	err = db.CreateVideo(dbConn, videoURL, video.Title, time.Now().UTC())
+	if err != nil {
+		http.Error(w, "Could not create video in database", http.StatusInternalServerError)
+		return
+	}
+
 	s3Client, err := CreateS3Client()
 	if err != nil {
 		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
@@ -219,19 +216,25 @@ func DeleteVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) 
 	ws := websocketmanager.GetConnection(session.UUID)
 
 	query := r.URL.Query()
-	videoTitle := query.Get("video-title")
-	if videoTitle == "" {
-		http.Error(w, "Missing video title", http.StatusBadRequest)
+	videoUrl := query.Get("video-url")
+	if videoUrl == "" {
+		http.Error(w, "Missing video url", http.StatusBadRequest)
 		return
 	}
 
-	decodedTitle, err := url.QueryUnescape(videoTitle)
+	decodedUrl, err := url.QueryUnescape(videoUrl)
 	if err != nil {
-		http.Error(w, "Invalid video title encoding", http.StatusBadRequest)
+		http.Error(w, "Invalid video url encoding", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("Received video title: %s", decodedTitle)
+	log.Printf("Received video url: %s", decodedUrl)
+
+	err = db.DeleteVideo(dbConn, decodedUrl)
+	if err != nil {
+		http.Error(w, "Failed to delete video from database", http.StatusInternalServerError)
+		return
+	}
 
 	s3Client, err := CreateS3Client()
 	if err != nil {
@@ -244,9 +247,78 @@ func DeleteVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = DeleteObject(*s3Client, bucket, videoTitle, ws)
+	ytClient := youtube.Client{}
+	video, err := ytClient.GetVideo(decodedUrl)
 	if err != nil {
-		log.Println("Error deleteing video from S3:", err)
+		http.Error(w, "Error fetching video from given URL", http.StatusInternalServerError)
+		return
+	}
+	err = DeleteObject(*s3Client, bucket, video.Title, ws)
+	if err != nil {
+		log.Println("Error deleting video from S3:", err)
 	}
 	w.Header().Set("HX-Refresh", "true")
+}
+
+func GetVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
+	isAuthenticated, session := VerifySession(dbConn, r)
+	if !isAuthenticated {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ws := websocketmanager.GetConnection(session.UUID)
+
+	query := r.URL.Query()
+	videoUrl := query.Get("video-url")
+	videoTitle := query.Get("video-title")
+	if videoUrl == "" || videoTitle == "" {
+		http.Error(w, "Missing video url or video title", http.StatusBadRequest)
+		return
+	}
+
+	decodedUrl, err := url.QueryUnescape(videoUrl)
+	if err != nil {
+		http.Error(w, "Invalid video url encoding", http.StatusBadRequest)
+		return
+	}
+	decodedTitle, err := url.QueryUnescape(videoTitle)
+	if err != nil {
+		http.Error(w, "Invalid video title encoding", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received video url: %s", decodedUrl)
+	log.Printf("Received video title: %s", decodedTitle)
+
+	video, err := db.GetVideo(dbConn, decodedUrl, decodedTitle)
+	if err != nil {
+		http.Error(w, "Failed to get video from database", http.StatusInternalServerError)
+		return
+	}
+
+	s3Client, err := CreateS3Client()
+	if err != nil {
+		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
+		return
+	}
+	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
+	if !exists {
+		http.Error(w, "Bucket env var not set", http.StatusInternalServerError)
+		return
+	}
+
+	bytes, err := GetObject(*s3Client, bucket, fmt.Sprintf("%s.mp4", video.Title))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Send video as binary message
+	err = ws.WriteMessage(websocket.BinaryMessage, bytes)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println("Video sent to client")
 }

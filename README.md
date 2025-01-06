@@ -1,7 +1,7 @@
 # Watch Together
 
 - A simple way to watch videos in real time with multiple connected clients using websockets
-- Implements real time play/pause and scrubbing and the ability to add/remove videos
+- Implements real time play/pause and scrubbing, ability to add/remove videos, and OAuth authentication
 
 # Demo
 
@@ -31,8 +31,8 @@
 
 # TODO
 
-- Bug when seeking, sends infinite play/pause messages
-- Make db source of truth for objects instead of S3, prevents list being called everytime in S3
-- Reconnect logic
+- Bug sometimes when seeking, sends infinite play/pause messages
+- s3 cleans objects using lifecycle rules, so need a way to sync up db and s3
 - Use `slog` and clean up inconsistencies of fmt and log
+- Reconnect logic?
 - Chat system?

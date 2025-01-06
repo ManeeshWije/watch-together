@@ -1,8 +1,8 @@
 function sendVideoKey(videoKey) {
     const spinner = document.getElementById("spinner");
+    console.log(videoKey)
     if (socket.readyState === WebSocket.OPEN) {
         spinner.style.display = "block";
-        socket.send(JSON.stringify({ type: "VIDEO_KEY", key: videoKey }));
     } else {
         console.error(
             "WebSocket is not open. Ready state: " + socket.readyState,

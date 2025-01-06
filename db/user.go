@@ -47,7 +47,7 @@ func GetUser(db *sql.DB, username string, email string) (*User, error) {
 	}
 	defer tx.Rollback()
 
-	query := `SELECT * from users WHERE username = $1 AND email = $2`
+	query := `SELECT uuid, username, email, created_at, num_uploads, is_admin from users WHERE username = $1 AND email = $2`
 
 	row := tx.QueryRow(query, username, email)
 

@@ -37,11 +37,10 @@ func ListObjects(s3Client s3.Client, bucket string) ([]*string, error) {
 	return objects, nil
 }
 
-func GetObject(s3Client s3.Client, bucket string, videoKey *string) ([]byte, error) {
-	// Call the GetObject API to retrieve the video content.
+func GetObject(s3Client s3.Client, bucket string, videoKey string) ([]byte, error) {
 	resp, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
-		Key:    aws.String(*videoKey),
+		Key:    aws.String(videoKey),
 	})
 	if err != nil {
 		return nil, err

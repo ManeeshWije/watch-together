@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -67,17 +66,6 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	defer websocketmanager.RemoveConnection(sessionID)
 	log.Println("Client Connected")
 
-	s3Client, err := utils.CreateS3Client()
-
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
-	if !exists {
-		log.Println("Bucket does not exist")
-		return
-	}
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
@@ -95,20 +83,6 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 			}
 
 			switch msg.Type {
-			case "VIDEO_KEY":
-				log.Printf("Received video key: %s", *msg.Key)
-				bytes, err := utils.GetObject(*s3Client, bucket, msg.Key)
-				if err != nil {
-					log.Println(err)
-					return
-				}
-				// Send video as binary message
-				err = ws.WriteMessage(websocket.BinaryMessage, bytes)
-				if err != nil {
-					log.Println(err)
-					return
-				}
-				log.Println("Video sent to client")
 			default:
 				log.Printf("Unhandled message type: %s", msg.Type)
 			}
@@ -153,6 +127,7 @@ func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, wsEndpoint)))))
 	http.Handle("/videos", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.ListVideosHandler)))))
 	http.Handle("/list-users", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(http.HandlerFunc(utils.ListUsersHandler)))))
+	http.Handle("/get-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.GetVideoHandler)))))
 	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.AddVideoHandler)))))
 	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.DeleteVideoHandler)))))
 
