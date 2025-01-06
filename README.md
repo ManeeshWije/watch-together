@@ -32,6 +32,7 @@
 # TODO
 
 - Bug sometimes when seeking, sends infinite play/pause messages
+- Delete expired user sessions periodically
 - s3 cleans objects using lifecycle rules, so need a way to sync up db and s3
 - Use `slog` and clean up inconsistencies of fmt and log
 - Reconnect logic?
