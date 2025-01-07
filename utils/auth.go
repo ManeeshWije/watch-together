@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"log/slog"
 )
 
 var googleOauthConfig *oauth2.Config
@@ -48,7 +48,7 @@ func OauthGoogleLogin(w http.ResponseWriter, r *http.Request) {
 func OauthGoogleCallback(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	data, err := getUserDataFromGoogle(r.FormValue("code"))
 	if err != nil {
-		log.Printf("Error fetching user data from Google: %v", err)
+		slog.Error("Error fetching user data from Google", "error", err)
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -56,14 +56,14 @@ func OauthGoogleCallback(dbConn *sql.DB, w http.ResponseWriter, r *http.Request)
 
 	user, err := db.GetUser(dbConn, userInfo.Name, userInfo.Email)
 	if err != nil {
-		log.Printf("Error retrieving user from database: %v", err)
+		slog.Error("Error retrieving user from database", "error", err)
 		return
 	}
 
 	if user == nil {
 		// No user found, create user and session
 		if err := createUserAndSession(dbConn, userInfo, w); err != nil {
-			log.Printf("Error creating user or session: %v", err)
+			slog.Error("Error creating user or session", "error", err)
 		}
 		http.Redirect(w, r, "/videos", http.StatusSeeOther)
 		return
@@ -72,14 +72,14 @@ func OauthGoogleCallback(dbConn *sql.DB, w http.ResponseWriter, r *http.Request)
 	// User exists, check session
 	session, err := db.GetUserSession(dbConn, user.UUID)
 	if err != nil {
-		log.Printf("Error retrieving user session: %v", err)
+		slog.Error("Error retrieving user session", "error", err)
 		return
 	}
 
 	// If no valid session, create a new one
 	if session == nil {
 		if err := createSession(dbConn, user.UUID, w); err != nil {
-			log.Printf("Error creating session: %v", err)
+			slog.Error("Error creating session", "error", err)
 		}
 	} else {
 		// If a valid session exists but no cookie, set the cookie
@@ -93,7 +93,7 @@ func OauthGoogleCallback(dbConn *sql.DB, w http.ResponseWriter, r *http.Request)
 				SameSite: http.SameSiteLaxMode,
 				Path:     "/",
 			})
-			log.Println("Auth cookie set from valid session in database")
+			slog.Info("Auth cookie set from valid session in database")
 		}
 	}
 	http.Redirect(w, r, "/videos", http.StatusSeeOther)
@@ -162,25 +162,25 @@ func createSession(dbConn *sql.DB, userUUID uuid.UUID, w http.ResponseWriter) er
 func VerifySession(dbConn *sql.DB, r *http.Request) (bool, *db.UserSession) {
 	cookie, err := r.Cookie("auth")
 	if err != nil {
-		log.Println("No auth cookie found:", err)
+		slog.Warn("No auth cookie found", "error", err)
 		return false, nil
 	}
 
 	sessionToken := cookie.Value
 	tokenUUID, err := uuid.Parse(sessionToken)
 	if err != nil {
-		log.Println("Invalid auth cookie value:", err)
+		slog.Warn("Invalid auth cookie value", "error", err)
 		return false, nil
 	}
 
 	// Verify the session in the database
 	session, err := db.GetUserSessionByToken(dbConn, tokenUUID)
 	if err != nil {
-		log.Printf("Error retrieving user session from VerifySession: %v", err)
+		slog.Error("Error retrieving user session from VerifySession", "error", err)
 		return false, nil
 	}
 	if session == nil {
-		log.Println("Session not found or expired")
+		slog.Warn("Session not found or expired")
 		return false, nil
 	}
 

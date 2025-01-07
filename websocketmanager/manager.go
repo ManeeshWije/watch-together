@@ -1,7 +1,7 @@
 package websocketmanager
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/google/uuid"
@@ -27,7 +27,7 @@ func AddConnection(sessionID uuid.UUID, username string, conn *websocket.Conn) {
 		Username:  username,
 		Conn:      conn,
 	}
-	log.Printf("Added connection for session %v (username: %s)", sessionID, username)
+	slog.Info("Added connection for session and username", "session", sessionID, "username", username)
 }
 
 func RemoveConnection(sessionID uuid.UUID) {
@@ -36,7 +36,7 @@ func RemoveConnection(sessionID uuid.UUID) {
 	if metadata, exists := connections[sessionID]; exists {
 		metadata.Conn.Close()
 		delete(connections, sessionID)
-		log.Printf("WebSocket connection for session %v (username: %s) closed and removed", sessionID, metadata.Username)
+		slog.Info("WebSocket connection for session username closed and removed", "session", sessionID, "username", metadata.Username)
 	}
 }
 
@@ -78,7 +78,7 @@ func BroadcastMessage(sender *websocket.Conn, message string) {
 		if connMetadata.Conn != sender {
 			err := connMetadata.Conn.WriteMessage(websocket.TextMessage, []byte(message))
 			if err != nil {
-				log.Printf("Error broadcasting message to client: %v", err)
+				slog.Error("Error broadcasting message to client", "error", err)
 				connMetadata.Conn.Close()
 				RemoveConnection(connMetadata.SessionID)
 			}

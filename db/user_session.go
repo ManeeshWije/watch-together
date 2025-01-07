@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -131,7 +132,7 @@ func DeleteExpiredSessions(db *sql.DB) error {
 		return fmt.Errorf("failed to retrieve rows affected: %v", err)
 	}
 
-	fmt.Printf("Deleted %d expired sessions\n", rowsAffected)
+	slog.Info("Deleted expired sessions", "rowsAffected", rowsAffected)
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %v", err)

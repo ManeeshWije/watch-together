@@ -3,10 +3,12 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
+
+	"log/slog"
 
 	"github.com/ManeeshWije/watch-together/db"
 	"github.com/ManeeshWije/watch-together/ratelimiter"
@@ -36,7 +38,7 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		slog.Error("Failed to upgrade connection", "error", err)
 		return
 	}
 	defer ws.Close()
@@ -44,32 +46,32 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// Retrieve the session ID from the request
 	cookie, err := r.Cookie("auth")
 	if err != nil {
-		log.Println("No auth cookie found:", err)
+		slog.Error("No auth cookie found", "error", err)
 		return
 	}
 
 	sessionID, err := uuid.Parse(cookie.Value)
 	if err != nil {
-		log.Println("Invalid auth cookie value:", err)
+		slog.Error("Invalid auth cookie value", "error", err)
 		return
 	}
 
 	// Fetch user
 	user, err := db.GetUserBySession(dbConn, sessionID)
 	if err != nil {
-		log.Println("Error fetching user by session", err)
+		slog.Error("Error fetching user by session", "error", err)
 		return
 	}
 
 	// Add the WebSocket connection to the manager
 	websocketmanager.AddConnection(sessionID, user.Username, ws)
 	defer websocketmanager.RemoveConnection(sessionID)
-	log.Println("Client Connected")
+	slog.Info("Client connected", "sessionID", sessionID, "username", user.Username)
 
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
-			log.Println(err)
+			slog.Error("Error reading message", "error", err)
 			websocketmanager.RemoveConnection(sessionID)
 			break
 		}
@@ -78,13 +80,13 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = json.Unmarshal(message, &msg)
 			if err != nil {
-				log.Println("Error unmarshaling message:", err)
+				slog.Error("Error unmarshaling message", "error", err)
 				continue
 			}
 
 			switch msg.Type {
 			default:
-				log.Printf("Unhandled message type: %s", msg.Type)
+				slog.Warn("Unhandled message type", "type", msg.Type)
 			}
 		}
 	}
@@ -93,9 +95,9 @@ func wsEndpoint(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 func logMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now().UTC()
-		log.Printf("Received request: Method: %s, URI: %s, RemoteAddr: %s", r.Method, r.RequestURI, r.RemoteAddr)
+		slog.Info("Received request", "method", r.Method, "uri", r.RequestURI, "remoteAddr", r.RemoteAddr)
 		next.ServeHTTP(w, r)
-		log.Printf("Request processed in %s\n", time.Since(start))
+		slog.Info("Request processed", "duration", time.Since(start))
 	})
 }
 
@@ -131,9 +133,9 @@ func dailyCleanup(dbConn *sql.DB) {
 
 			// Run the DeleteExpiredSessions function
 			if err := db.DeleteExpiredSessions(dbConn); err != nil {
-				log.Printf("Error running DeleteExpiredSessions: %v", err)
+				slog.Error("Error running DeleteExpiredSessions", "error", err)
 			} else {
-				log.Println("Successfully ran DeleteExpiredSessions")
+				slog.Info("Successfully ran DeleteExpiredSessions")
 			}
 		}
 	}()
@@ -157,17 +159,21 @@ func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Error loading .env file")
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	if err := godotenv.Load(); err != nil {
+		slog.Warn("Error loading .env file", "error", err)
 	}
 	dbConn := db.Connect()
 	defer dbConn.Close()
+
 	db.Migrate()
+
 	rateLimiter := ratelimiter.NewRateLimiter(5, 10)
 	utils.InitOAuthConfig()
 	setupRoutes(dbConn, rateLimiter)
 	dailyCleanup(dbConn)
-	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	slog.Info("Server started on :8080")
+	slog.Error("Server shutdown", "error", http.ListenAndServe(":8080", nil))
 }

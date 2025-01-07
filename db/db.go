@@ -2,7 +2,7 @@ package db
 
 import (
 	"database/sql"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -24,17 +24,17 @@ func Connect() *sql.DB {
 
 	db.SetMaxOpenConns(10)
 
-	log.Printf("Successfully connected!")
+	slog.Info("Successfully connected!")
 	return db
 }
 
 func Migrate() {
 	m, err := migrate.New("file://db/migrations", os.Getenv("DATABASE_PUBLIC_URL"))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to run migrations", "error", err)
 	}
 	if err := m.Up(); err != nil {
-		log.Println(err)
+		slog.Warn("Failed to call up() on migrations", "error", err)
 	}
-	log.Printf("Migrations successfully ran")
+	slog.Info("Migrations successfully ran")
 }

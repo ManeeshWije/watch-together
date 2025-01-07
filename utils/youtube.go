@@ -3,10 +3,11 @@ package utils
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strings"
+
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gorilla/websocket"
@@ -65,7 +66,7 @@ func StreamToS3(client youtube.Client, video *youtube.Video, bucketName, s3Key s
 	progressMessage := "DOWNLOADING"
 	err = ws.WriteMessage(websocket.TextMessage, []byte(progressMessage))
 	if err != nil {
-		log.Println("Error sending downloading message to client:", err)
+		slog.Error("Error sending downloading message to client", "error", err)
 		return err
 	}
 
@@ -89,7 +90,7 @@ func StreamToS3(client youtube.Client, video *youtube.Video, bucketName, s3Key s
 	progressMessage = "DOWNLOADED"
 	err = ws.WriteMessage(websocket.TextMessage, []byte(progressMessage))
 	if err != nil {
-		log.Println("Error sending downloaded message to client:", err)
+		slog.Error("Error sending downloaded message to client", "error", err)
 		return err
 	}
 
