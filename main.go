@@ -145,17 +145,17 @@ func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 	clientfs := http.FileServer(http.Dir("client"))
 	http.Handle("/client/", logMiddleware(rateLimiter.Middleware(http.StripPrefix("/client/", clientfs))))
 	http.Handle("/", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.IndexHandler))))
-	http.Handle("/logout", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.LogoutHandler))))
+	http.Handle("POST /logout", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.LogoutHandler))))
 
 	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, wsEndpoint)))))
-	http.Handle("/videos", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.ListVideosHandler)))))
-	http.Handle("/list-users", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(http.HandlerFunc(utils.ListUsersHandler)))))
-	http.Handle("/get-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.GetVideoHandler)))))
-	http.Handle("/add-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.AddVideoHandler)))))
-	http.Handle("/delete-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.DeleteVideoHandler)))))
+	http.Handle("GET /videos", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.ListVideosHandler)))))
+	http.Handle("GET /list-users", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(http.HandlerFunc(utils.ListUsersHandler)))))
+	http.Handle("GET /get-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.GetVideoHandler)))))
+	http.Handle("POST /add-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.AddVideoHandler)))))
+	http.Handle("POST /delete-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.DeleteVideoHandler)))))
 
-	http.Handle("/auth/google/login", logMiddleware(rateLimiter.Middleware(http.HandlerFunc(utils.OauthGoogleLogin))))
-	http.Handle("/auth/google/callback", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.OauthGoogleCallback))))
+	http.Handle("GET /auth/google/login", logMiddleware(rateLimiter.Middleware(http.HandlerFunc(utils.OauthGoogleLogin))))
+	http.Handle("GET /auth/google/callback", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.OauthGoogleCallback))))
 }
 
 func main() {
