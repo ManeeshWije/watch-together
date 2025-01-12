@@ -143,11 +143,11 @@ func dailyCleanup(dbConn *sql.DB) {
 
 func setupRoutes(dbConn *sql.DB, rateLimiter *ratelimiter.RateLimiter) {
 	clientfs := http.FileServer(http.Dir("client"))
-	http.Handle("/client/", logMiddleware(rateLimiter.Middleware(http.StripPrefix("/client/", clientfs))))
-	http.Handle("/", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.IndexHandler))))
+	http.Handle("GET /client/", logMiddleware(rateLimiter.Middleware(http.StripPrefix("/client/", clientfs))))
+	http.Handle("GET /", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.IndexHandler))))
 	http.Handle("POST /logout", logMiddleware(rateLimiter.Middleware(dbHandler(dbConn, utils.LogoutHandler))))
 
-	http.Handle("/ws", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, wsEndpoint)))))
+	http.Handle("GET /ws", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, wsEndpoint)))))
 	http.Handle("GET /videos", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.ListVideosHandler)))))
 	http.Handle("GET /list-users", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(http.HandlerFunc(utils.ListUsersHandler)))))
 	http.Handle("GET /get-video", logMiddleware(authMiddleware(dbConn, rateLimiter.Middleware(dbHandler(dbConn, utils.GetVideoHandler)))))
