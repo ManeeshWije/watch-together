@@ -29,7 +29,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 8192,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return origin == "http://localhost:8080" || origin == "https://watch-together.up.railway.app"
+		return origin == "http://localhost:8080" || origin == "https://watch.wijeproject.com"
 	},
 }
 
