@@ -21,7 +21,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-COPY --from=build /app/watch-together /app/
+COPY --from=build /app /app
 
 EXPOSE 8080
 
