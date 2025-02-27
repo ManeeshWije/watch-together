@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 
 WORKDIR /app
 
@@ -6,18 +6,22 @@ COPY . /app
 
 RUN go mod download
 
-RUN go build
+# Use build arguments to set target platform
+ARG TARGETOS
+ARG TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o watch-together
 
-FROM alpine:3.18
+# Final stage
+FROM --platform=$TARGETPLATFORM alpine:3.18
 
-# Install any necessary packages, like certificates
+# Install necessary packages
 RUN apk add --no-cache \
     ca-certificates \
     ffmpeg
 
 WORKDIR /app
 
-COPY --from=build /app /app
+COPY --from=build /app/watch-together /app/
 
 EXPOSE 8080
 
