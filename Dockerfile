@@ -6,6 +6,10 @@ COPY . /app
 
 RUN go mod download
 
+RUN go get -u
+
+RUN go mod tidy
+
 RUN go build
 
 FROM alpine:3.18
