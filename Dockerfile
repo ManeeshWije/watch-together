@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 
 WORKDIR /app
 
@@ -10,9 +10,12 @@ RUN go get -u
 
 RUN go mod tidy
 
-RUN go build
+# Use build arguments to set target platform
+ARG TARGETOS
+ARG TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o watch-together
 
-FROM alpine:3.18
+FROM --platform=$TARGETPLATFORM alpine:3.18
 
 # Install any necessary packages, like certificates
 RUN apk add --no-cache \
