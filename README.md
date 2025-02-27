@@ -18,8 +18,8 @@
     - export AWS_SECRET_ACCESS_KEY=
     - export AWS_S3_BUCKET=
     - export DATABASE_PUBLIC_URL=
-    - export CLIENT_ID=
-    - export CLIENT_SECRET=
+    - export GOOGLE_CLIENT_ID=
+    - export GOOGLE_CLIENT_SECRET=
     - export GOOGLE_REDIRECT_URL=
 - `air` will run the server in watch mode, or simply run the server using `go run main.go`
 
