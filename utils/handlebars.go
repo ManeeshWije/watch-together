@@ -42,7 +42,7 @@ func registerPartials() {
 }
 
 // RenderTemplate renders a Handlebars template with the provided data.
-func RenderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
+func RenderTemplate(w http.ResponseWriter, tmpl string, data any) {
 	once.Do(registerPartials) // Register partials only once
 
 	templatePath := filepath.Join("views", tmpl)
@@ -129,7 +129,7 @@ func ListVideosHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	RenderTemplate(w, "index.hbs", map[string]interface{}{
+	RenderTemplate(w, "index.hbs", map[string]any{
 		"Authenticated": isAuthenticated,
 		"videos":        videos,
 	})
@@ -203,12 +203,6 @@ func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := db.CreateVideo(dbConn, videoURL, video.Title, time.Now().UTC()); err != nil {
-		slog.Error("Database error while creating video", "video", video.Title, "error", err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-
 	s3Client, err := CreateS3Client()
 	if err != nil {
 		slog.Error("S3 client error", "error", err)
@@ -225,6 +219,12 @@ func AddVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	if err := StreamToS3(ytClient, video, bucket, fmt.Sprintf("%s.mp4", video.Title), *s3Client, ws); err != nil {
 		slog.Error("Error uploading to S3", "video", video.Title, "error", err)
+		return
+	}
+
+	if err := db.CreateVideo(dbConn, videoURL, video.Title, time.Now().UTC()); err != nil {
+		slog.Error("Database error while creating video", "video", video.Title, "error", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
@@ -257,19 +257,13 @@ func DeleteVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = db.DeleteVideo(dbConn, decodedUrl)
-	if err != nil {
-		slog.Error("Failed to delete video from db", "decodedUrl", decodedUrl, "error", err)
-		http.Error(w, "Failed to delete video from database", http.StatusInternalServerError)
-		return
-	}
-
 	s3Client, err := CreateS3Client()
 	if err != nil {
 		slog.Error("Failed to create s3 client", "error", err)
 		http.Error(w, "Failed to fetch s3 client", http.StatusInternalServerError)
 		return
 	}
+
 	bucket, exists := os.LookupEnv("AWS_S3_BUCKET")
 	if !exists {
 		slog.Error("Bucket env var not set", "exists", exists)
@@ -284,10 +278,18 @@ func DeleteVideoHandler(dbConn *sql.DB, w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Error fetching video from given URL", http.StatusInternalServerError)
 		return
 	}
+
 	err = DeleteObject(*s3Client, bucket, video.Title, ws)
 	if err != nil {
 		slog.Error("Failed to delete video from S3", "title", video.Title, "error", err)
 		http.Error(w, "Error deleting video from S3", http.StatusInternalServerError)
+	}
+
+	err = db.DeleteVideo(dbConn, decodedUrl)
+	if err != nil {
+		slog.Error("Failed to delete video from db", "decodedUrl", decodedUrl, "error", err)
+		http.Error(w, "Failed to delete video from database", http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("HX-Refresh", "true")
 }
