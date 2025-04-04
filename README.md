@@ -11,23 +11,23 @@
 
 ### Server
 
-- These env vars must be set before running the command below
-    - export AWS_URL=
-    - export AWS_ACCESS_KEY_ID=
-    - export AWS_REGION=
-    - export AWS_SECRET_ACCESS_KEY=
-    - export AWS_S3_BUCKET=
-    - export DATABASE_PUBLIC_URL=
-    - export GOOGLE_CLIENT_ID=
-    - export GOOGLE_CLIENT_SECRET=
-    - export GOOGLE_REDIRECT_URL=
-- `air` will run the server in watch mode, or simply run the server using `go run main.go`
+- These env vars must be set in `.env`
+  - AWS_URL=\<url\>
+  - AWS_ACCESS_KEY_ID=\<access_key_id\>
+  - AWS_REGION=us-east-1
+  - AWS_SECRET_ACCESS_KEY=\<secret_access_key\>
+  - AWS_S3_BUCKET=bucket-name
+  - DATABASE_URL=postgres://test:test@test/test
+  - GOOGLE_CLIENT_ID=\<google_client_id\>
+  - GOOGLE_CLIENT_SECRET=\<google_client_secret\>
+  - BASE_URL=http://localhost:8080
+  - CLIENT_URL=http://localhost:5173
+- `cargo run`
 
 ### Client
 
-- `npm install` to install tailwind
-- `npx tailwindcss -i ./client/input.css -o ./client/output.css --minify --watch` to generate styles in watch mode
-- `client.js` change websocket url to localhost when local server running
+- `npm install`
+- `npm run dev`
 
 # TODO
 

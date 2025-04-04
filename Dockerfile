@@ -1,41 +1,43 @@
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM rust:latest AS rbuilder
+WORKDIR /backend
+COPY backend .
 
-WORKDIR /app
+RUN cargo install sqlx-cli
+ENV SQLX_OFFLINE true
 
-COPY . /app
-
-RUN go mod download
-
-RUN go get -u
-
-RUN go mod tidy
-
-# Use build arguments to set target platform
-ARG TARGETOS
+# Set the target architecture based on the platform
 ARG TARGETARCH
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o watch-together
+RUN rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu
 
-FROM --platform=$TARGETPLATFORM alpine:3.18
+# Build for the target platform
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        cargo build --release --target=aarch64-unknown-linux-gnu; \
+    else \
+        cargo build --release --target=x86_64-unknown-linux-gnu; \
+    fi
 
-# Install any necessary packages, like certificates
-RUN apk add --no-cache \
-    ca-certificates \
-    ffmpeg
+# Strip binary to reduce size
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        strip target/aarch64-unknown-linux-gnu/release/watch-together; \
+    else \
+        strip target/x86_64-unknown-linux-gnu/release/watch-together; \
+    fi
 
+# Node.js frontend build stage
+FROM --platform=$BUILDPLATFORM node:20-slim AS jbuilder
+WORKDIR /frontend
+COPY frontend .
+RUN npm install
+RUN npm run build
+
+# Final stage using distroless
+FROM --platform=$TARGETPLATFORM gcr.io/distroless/cc-debian12:latest AS release
 WORKDIR /app
 
-COPY --from=build /app /app
+# Copy the correct binary based on architecture
+ARG TARGETARCH
+COPY --from=rbuilder /backend/target/aarch64-unknown-linux-gnu/release/watch-together ./watch-together
+COPY --from=jbuilder /frontend/dist/ dist/
 
 EXPOSE 8080
-
-ENV AWS_URL=""
-ENV AWS_ACCESS_KEY_ID=""
-ENV AWS_REGION=""
-ENV AWS_SECRET_ACCESS_KEY=""
-ENV AWS_S3_BUCKET=""
-ENV DATABASE_PUBLIC_URL=""
-ENV CLIENT_ID=""
-ENV CLIENT_SECRET=""
-ENV GOOGLE_REDIRECT_URL=""
-
-CMD ["/app/watch-together"]
+CMD ["./watch-together", "--tracing-level", "INFO", "--run-migrations"]
