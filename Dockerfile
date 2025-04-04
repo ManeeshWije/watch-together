@@ -18,7 +18,10 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS release
 WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ~/.local/bin/yt-dlp && chmod a+rx ~/.local/bin/yt-dlp
+RUN echo "deb http://ftp.us.debian.org/debian bookworm main non-free" > /etc/apt/sources.list.d/non-free.list
+RUN apt update
+RUN apt-get install software-properties-common
+RUN add-apt-repository ppa:tomtomtom/yt-dlp && apt-get update && apt-get install yt-dlp
 COPY --from=rbuilder /backend/target/release/watch-together .
 COPY --from=jbuilder /frontend/dist/ dist/
 EXPOSE 8080
