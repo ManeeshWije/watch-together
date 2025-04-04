@@ -18,7 +18,7 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS release
 WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN add-apt-repository ppa:tomtomtom/yt-dlp && apt-get update && apt install yt-dlp
+RUN add-apt-repository ppa:tomtomtom/yt-dlp && apt-get update && apt-get install yt-dlp
 COPY --from=rbuilder /backend/target/release/watch-together .
 COPY --from=jbuilder /frontend/dist/ dist/
 EXPOSE 8080
