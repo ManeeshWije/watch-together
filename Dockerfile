@@ -17,10 +17,18 @@ RUN npm run build
 FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS release
 WORKDIR /app
 # Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
-RUN mkdir -p ~/.local/bin
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ~/.local/bin/yt-dlp
-RUN chmod a+rx ~/.local/bin/yt-dlp
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/bin/yt-dlp
+RUN chmod +x /usr/bin/yt-dlp
 COPY --from=rbuilder /backend/target/release/watch-together .
 COPY --from=jbuilder /frontend/dist/ dist/
 EXPOSE 8080
