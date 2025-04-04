@@ -20,8 +20,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN echo "deb http://ftp.us.debian.org/debian bookworm main non-free" > /etc/apt/sources.list.d/non-free.list
 RUN apt update
-RUN apt-get install software-properties-common
-RUN add-apt-repository ppa:tomtomtom/yt-dlp && apt-get update && apt-get install yt-dlp
+RUN apt-get install -y software-properties-common
+RUN add-apt-repository -y ppa:tomtomtom/yt-dlp && apt-get update && apt-get install -y yt-dlp
 COPY --from=rbuilder /backend/target/release/watch-together .
 COPY --from=jbuilder /frontend/dist/ dist/
 EXPOSE 8080
