@@ -44,19 +44,16 @@ pub async fn get_video(
                     send_video_in_chunks(sender, video_data).await;
                 });
 
-                return (StatusCode::OK, Json("Streaming entire video via WebSocket"))
-                    .into_response();
+                (StatusCode::OK, Json("Streaming entire video via WebSocket")).into_response()
             } else {
-                return (StatusCode::NOT_FOUND, Json("WebSocket client not found")).into_response();
+                (StatusCode::NOT_FOUND, Json("WebSocket client not found")).into_response()
             }
         }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Failed to retrieve video"),
-            )
-                .into_response();
-        }
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json("Failed to retrieve video"),
+        )
+            .into_response(),
     }
 }
 
@@ -82,18 +79,6 @@ async fn send_video_in_chunks(sender: Sender<Message>, video_bytes: Bytes) {
     }
 
     println!("Finished streaming video");
-}
-
-async fn _send_entire_video(sender: Sender<Message>, video_bytes: Bytes) {
-    if sender
-        .send(Message::Binary(video_bytes.to_vec()))
-        .await
-        .is_err()
-    {
-        println!("WebSocket client disconnected.");
-    } else {
-        println!("Finished sending entire video.");
-    }
 }
 
 pub async fn add_video(

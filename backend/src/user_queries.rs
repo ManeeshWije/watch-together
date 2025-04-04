@@ -120,20 +120,6 @@ pub async fn create_user_session(
     Ok(user_session)
 }
 
-pub async fn _delete_user(pool: &PgPool, uuid: Uuid) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        "
-        DELETE FROM users
-        WHERE uuid = $1
-        ",
-        uuid
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
 pub async fn delete_user_session(pool: &PgPool, session_uuid: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query!(
         "

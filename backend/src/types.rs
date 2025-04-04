@@ -4,10 +4,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{
-    broadcast::{Receiver, Sender},
-    mpsc, Mutex,
-};
+use tokio::sync::{broadcast::Sender, mpsc, Mutex};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,7 +36,6 @@ pub struct Video {
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub broadcast_tx: Arc<Sender<Message>>,
-    pub _broadcast_rx: Arc<Receiver<Message>>,
     pub web_socket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
     pub aws_s3_bucket: String,
     pub aws_client: Client,

@@ -1,6 +1,6 @@
 use aws_sdk_s3::{
-    types::{CompletedMultipartUpload, CompletedPart, Object},
-    Client, Error,
+    types::{CompletedMultipartUpload, CompletedPart},
+    Client,
 };
 use axum::{body::Bytes, extract::ws::Message};
 use rustube::{Id, VideoDetails, VideoFetcher};
@@ -11,24 +11,6 @@ use tokio::process::Command;
 use tokio::{io::AsyncReadExt, sync::broadcast::Sender};
 
 const PART_SIZE: usize = 5 * 1024 * 1024; // 5MB
-
-async fn _list_objects(client: &Client, bucket: &str) -> Result<Vec<Object>, Error> {
-    let mut objects = Vec::new();
-
-    let response = client
-        .list_objects_v2()
-        .bucket(bucket.to_owned())
-        .max_keys(10)
-        .send()
-        .await?;
-
-    for object in response.contents.unwrap_or_else(Vec::new) {
-        println!(" - {}", object.key.as_deref().unwrap_or("Unknown"));
-        objects.push(object);
-    }
-
-    Ok(objects)
-}
 
 pub async fn get_object(
     client: &Client,

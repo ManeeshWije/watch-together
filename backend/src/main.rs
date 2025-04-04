@@ -24,7 +24,10 @@ use axum_extra::extract::CookieJar;
 use dotenv::dotenv;
 use futures::SinkExt;
 use futures_util::StreamExt;
-use http::{header::{CONNECTION, CONTENT_TYPE, UPGRADE}, HeaderValue, Method};
+use http::{
+    header::{CONNECTION, CONTENT_TYPE, UPGRADE},
+    HeaderValue, Method,
+};
 use sqlx::PgPool;
 use std::{collections::HashMap, fs, time::Duration};
 use std::{env, net::SocketAddr, sync::Arc};
@@ -68,13 +71,12 @@ async fn main() {
 
     tokio::spawn(delete_expired_sessions_task(pool.clone()));
 
-    let (tx, rx) = broadcast::channel(32);
+    let (tx, _) = broadcast::channel(32);
 
     let web_socket_clients = Arc::new(Mutex::new(HashMap::new()));
 
     let app_state = types::AppState {
         broadcast_tx: Arc::new(tx),
-        _broadcast_rx: Arc::new(rx),
         web_socket_clients,
         aws_s3_bucket,
         aws_client: s3,
@@ -212,7 +214,7 @@ async fn handle_socket(socket: WebSocket, app_state: types::AppState, cookies: C
             let should_forward = match &msg {
                 Message::Text(text) => {
                     let last_msg = last_message_clone.lock().await;
-                    !last_msg.as_ref().is_some_and(|last| last == text)
+                    last_msg.as_ref().is_none_or(|last| last != text)
                 }
                 _ => true, // Always forward binary messages
             };

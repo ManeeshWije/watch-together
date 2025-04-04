@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::{types, user_queries};
 use anyhow::Context;
 use axum::{
@@ -14,6 +12,7 @@ use oauth2::{
 };
 use oauth2::{reqwest::async_http_client, PkceCodeVerifier};
 use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
+use std::env;
 use uuid::Uuid;
 
 use super::constants::{
@@ -158,21 +157,17 @@ pub async fn callback(
 
     let user = match existing_user {
         Ok(user) => user,
-        Err(_) => {
-            let new_user = user_queries::create_user(
-                &app_state.pool,
-                uuid::Uuid::new_v4(),
-                google_user.name.as_str(),
-                account_email.as_str(),
-            )
-            .await
-            .map_err(|err| {
-                eprintln!("Failed to create user: {}", err);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-
-            new_user
-        }
+        Err(_) => user_queries::create_user(
+            &app_state.pool,
+            uuid::Uuid::new_v4(),
+            google_user.name.as_str(),
+            account_email.as_str(),
+        )
+        .await
+        .map_err(|err| {
+            eprintln!("Failed to create user: {}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?,
     };
 
     // check if the user session exists already and is valid. if not create a new one
@@ -186,17 +181,12 @@ pub async fn callback(
 
     let user_session = match user_session {
         Ok(user_session) => user_session,
-        Err(_) => {
-            let new_user_session =
-                user_queries::create_user_session(&app_state.pool, user.uuid, SESSION_DURATION)
-                    .await
-                    .map_err(|err| {
-                        eprintln!("Failed to create user session: {}", err);
-                        StatusCode::INTERNAL_SERVER_ERROR
-                    })?;
-
-            new_user_session
-        }
+        Err(_) => user_queries::create_user_session(&app_state.pool, user.uuid, SESSION_DURATION)
+            .await
+            .map_err(|err| {
+                eprintln!("Failed to create user session: {}", err);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?,
     };
 
     // Remove code_verifier and csrf_state cookies
