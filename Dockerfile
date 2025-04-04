@@ -2,39 +2,40 @@ FROM --platform=$BUILDPLATFORM rust:latest AS rbuilder
 WORKDIR /backend
 COPY backend .
 
-RUN cargo install sqlx-cli
-ENV SQLX_OFFLINE true
+# Install cross-compilation toolchains
+RUN apt-get update && \
+    apt-get install -y gcc-aarch64-linux-gnu && \
+    rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu
 
-# Set the target architecture based on the platform
-ARG TARGETARCH
-RUN rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu
+RUN cargo install sqlx-cli
+ENV SQLX_OFFLINE=true
 
 # Build for the target platform
+ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         cargo build --release --target=aarch64-unknown-linux-gnu; \
     else \
         cargo build --release --target=x86_64-unknown-linux-gnu; \
     fi
 
-# Strip binary to reduce size
+# Strip binary
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         strip target/aarch64-unknown-linux-gnu/release/watch-together; \
     else \
         strip target/x86_64-unknown-linux-gnu/release/watch-together; \
     fi
 
-# Node.js frontend build stage
+# Frontend build stage
 FROM --platform=$BUILDPLATFORM node:20-slim AS jbuilder
 WORKDIR /frontend
 COPY frontend .
 RUN npm install
 RUN npm run build
 
-# Final stage using distroless
+# Final distroless stage
 FROM --platform=$TARGETPLATFORM gcr.io/distroless/cc-debian12:latest AS release
 WORKDIR /app
 
-# Copy the correct binary based on architecture
 ARG TARGETARCH
 COPY --from=rbuilder /backend/target/aarch64-unknown-linux-gnu/release/watch-together ./watch-together
 COPY --from=jbuilder /frontend/dist/ dist/
