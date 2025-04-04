@@ -24,10 +24,6 @@ use axum_extra::extract::CookieJar;
 use dotenv::dotenv;
 use futures::SinkExt;
 use futures_util::StreamExt;
-use http::{
-    header::{CONNECTION, CONTENT_TYPE, UPGRADE},
-    HeaderValue, Method,
-};
 use sqlx::PgPool;
 use std::{collections::HashMap, fs, time::Duration};
 use std::{env, net::SocketAddr, sync::Arc};
@@ -89,18 +85,6 @@ async fn main() {
         "./dist"
     };
 
-    let cors_origin = env::var("CLIENT_URL")
-        .unwrap()
-        .as_str()
-        .parse::<HeaderValue>()
-        .unwrap();
-
-    let cors_middleware = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
-        .allow_origin(cors_origin)
-        .allow_headers(vec![CONTENT_TYPE, UPGRADE, CONNECTION])
-        .allow_credentials(true);
-
     // build our application with some routes
     let app = Router::new()
         .nest_service("/", ServeDir::new(dist_dir))
@@ -115,7 +99,12 @@ async fn main() {
         .route("/auth/google/login", get(auth::login))
         .route("/auth/google/callback", get(auth::callback))
         .with_state(app_state)
-        .layer(cors_middleware)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any)
+                .allow_methods(tower_http::cors::Any),
+        )
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
