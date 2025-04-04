@@ -26,7 +26,7 @@ jobs:
         context: .
         platforms: linux/arm64
         push: true
-        tags: maneeshwije/watch-together:latest-arm64,maneeshwije/watch-together:arm64
+        tags: maneeshwije/watch-together:latest-arm64
 
   build-amd64:
     runs-on: ubuntu-latest
@@ -49,21 +49,4 @@ jobs:
         context: .
         platforms: linux/amd64
         push: true
-        tags: maneeshwije/watch-together:latest-amd64,maneeshwije/watch-together:amd64
-
-  create-manifest:
-    needs: [build-arm64, build-amd64]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
-    - name: Create and push manifest
-      run: |
-        docker manifest create maneeshwije/watch-together:latest \
-          maneeshwije/watch-together:latest-arm64 \
-          maneeshwije/watch-together:latest-amd64
-        docker manifest push maneeshwije/watch-together:latest
+        tags: maneeshwije/watch-together:latest-amd64
