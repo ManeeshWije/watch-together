@@ -4,9 +4,6 @@ WORKDIR /backend
 COPY backend .
 # Install build dependencies
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
-RUN cargo install sqlx-cli
-RUN sqlx db create
-RUN sqlx migrate run
 RUN cargo build --release
 RUN strip target/release/watch-together
 
