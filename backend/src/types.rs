@@ -3,6 +3,8 @@ use axum::extract::ws::Message;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::net::IpAddr;
+use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{broadcast::Sender, mpsc, Mutex};
 use uuid::Uuid;
@@ -40,6 +42,7 @@ pub struct AppState {
     pub aws_s3_bucket: String,
     pub aws_client: Client,
     pub pool: PgPool,
+    pub rate_limiter: SharedRateLimiter,
 }
 
 // What we get back from Google
@@ -67,3 +70,22 @@ pub struct AuthResponse {
 pub struct AddVideoRequest {
     pub url: String,
 }
+
+#[derive(Debug)]
+pub struct TokenBucket {
+    pub capacity: usize,
+    pub tokens: usize,
+    pub refill_rate: usize,
+    pub last_refill: Instant,
+}
+
+// Rate limiter that maintains token buckets for each client
+#[derive(Debug)]
+pub struct RateLimiter {
+    pub buckets: HashMap<IpAddr, TokenBucket>,
+    pub capacity: usize,
+    pub refill_rate: usize,
+}
+
+// Type for shared access to the rate limiter
+pub type SharedRateLimiter = Arc<Mutex<RateLimiter>>;

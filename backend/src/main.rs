@@ -2,6 +2,7 @@ mod auth;
 mod aws;
 mod connection;
 mod constants;
+mod rate_limiter;
 mod types;
 mod user_handler;
 mod user_queries;
@@ -16,6 +17,7 @@ use axum::{
         ws::{Message, WebSocket},
         State, WebSocketUpgrade,
     },
+    middleware::from_fn_with_state,
     response::{Redirect, Response},
     routing::{get, post},
     Router,
@@ -68,8 +70,10 @@ async fn main() {
         });
     let cfg = load_from_env().await;
     let s3 = Client::new(&cfg);
+    let rate_limiter = rate_limiter::create_rate_limiter(50, 5);
 
     tokio::spawn(delete_expired_sessions_task(pool.clone()));
+    tokio::spawn(rate_limiter::cleanup_rate_limiters(rate_limiter.clone()));
 
     let (tx, _) = broadcast::channel(32);
 
@@ -81,6 +85,7 @@ async fn main() {
         aws_s3_bucket,
         aws_client: s3,
         pool,
+        rate_limiter,
     };
 
     let dist_dir = if cfg!(debug_assertions) {
@@ -114,7 +119,11 @@ async fn main() {
         .route("/auth/session", get(auth::session))
         .route("/auth/google/login", get(auth::login))
         .route("/auth/google/callback", get(auth::callback))
-        .with_state(app_state)
+        .with_state(app_state.clone())
+        .layer(from_fn_with_state(
+            app_state,
+            rate_limiter::rate_limit_middleware,
+        ))
         .layer(cors_middleware)
         .layer(
             TraceLayer::new_for_http()
