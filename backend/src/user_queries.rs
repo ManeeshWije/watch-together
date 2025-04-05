@@ -18,6 +18,21 @@ pub async fn fetch_user_by_email(pool: &PgPool, email: &str) -> Result<User, sql
     Ok(user)
 }
 
+pub async fn fetch_user_by_uuid(pool: &PgPool, uuid: Uuid) -> Result<User, sqlx::Error> {
+    let user = sqlx::query_as!(
+        User,
+        "
+        SELECT * FROM users
+        WHERE uuid = $1
+        ",
+        uuid
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(user)
+}
+
 pub async fn fetch_user_by_session_uuid(
     pool: &PgPool,
     session_uuid: Uuid,

@@ -31,6 +31,5 @@
 
 # TODO
 
-- Bug sometimes when seeking, sends infinite play/pause messages
-- Reconnect logic?
+- Don't load the whole video into memory, even though we send by chunks
 - Chat system?

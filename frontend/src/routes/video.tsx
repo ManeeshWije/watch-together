@@ -1,22 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import Nav from "../components/Nav";
-import { VideoData } from "../types";
-import { useQuery } from "@tanstack/react-query";
-import { useAuthQuery } from "../utils";
+import { addVideo, deleteVideo, fetchVideos, getVideo, useAuthQuery, fetchConnectedUsers } from "../utils";
 import Spinner from "../components/Spinner";
+import { User, VideoData } from "../types";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 const serverUrl = import.meta.env.MODE === "production" ? "" : "http://localhost:8080";
-
-async function fetchVideos(): Promise<VideoData[]> {
-    const response = await fetch(`${serverUrl}/list-videos`, {
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to fetch videos");
-    }
-    return response.json();
-}
 
 export const Route = createFileRoute("/video")({
     component: Video,
@@ -25,6 +15,7 @@ export const Route = createFileRoute("/video")({
 function Video() {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [socket, setSocket] = useState<WebSocket | null>(null);
+    const [isSocketReady, setIsSocketReady] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [videoUrl, setVideoUrl] = useState("");
@@ -34,6 +25,16 @@ function Video() {
     const [_videoBlob, setVideoBlob] = useState<Blob | null>(null);
     const [receivedSize, setReceivedSize] = useState(0);
     const [totalSize, setTotalSize] = useState(0);
+
+    const {
+        data: connectedUsers,
+        error: usersError,
+        isLoading: usersLoading,
+    } = useQuery<User[], Error>({
+        queryKey: ["connectedUsers"],
+        queryFn: fetchConnectedUsers,
+        enabled: isSocketReady,
+    });
 
     const { data: authData, isLoading: authLoading, error: authError } = useAuthQuery();
 
@@ -47,13 +48,38 @@ function Video() {
         queryFn: fetchVideos,
     });
 
+    const addVideoMutation = useMutation({
+        mutationFn: addVideo,
+        onError: () => setErrorMessage("Error adding video. Please try again."),
+        onSuccess: () => {
+            refetch();
+            setVideoUrl("");
+        },
+    });
+
+    const deleteVideoMutation = useMutation({
+        mutationFn: deleteVideo,
+        onError: () => setErrorMessage("Error deleting video. Please try again."),
+        onSuccess: () => refetch(),
+    });
+
+    const getVideoMutation = useMutation({
+        mutationFn: getVideo,
+        onSuccess: (videoData: VideoData) => {
+            setTotalSize(videos?.find((video) => video.title === videoData.title)?.size || 0);
+        },
+    });
+
     useEffect(() => {
         if (!socket) {
             const newSocket = new WebSocket(`${serverUrl}/ws`);
             newSocket.binaryType = "arraybuffer";
             setSocket(newSocket);
 
-            newSocket.onopen = () => console.log("Connected to WebSocket");
+            newSocket.onopen = () => {
+                console.log("Connected to WebSocket");
+                setIsSocketReady(true);
+            };
             newSocket.onclose = () => console.log("Disconnected from WebSocket");
             newSocket.onerror = (e) => console.error("WebSocket error:", e);
 
@@ -116,89 +142,46 @@ function Video() {
         }
     }
 
-    async function handleVideoClick(videoTitle: string) {
+    const handleVideoClick = async (videoTitle: string) => {
         setLoading(true);
         setVideoChunks([]);
         setVideoBlob(null);
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
-        const selectedVideo = videos?.find((video) => video.title === videoTitle);
-        if (selectedVideo) {
-            setTotalSize(selectedVideo.size);
-        }
 
         try {
-            const response = await fetch(`${serverUrl}/get-video/${videoTitle}`, {
-                credentials: "include",
-            });
-            if (!response.ok) {
-                throw new Error("Failed to request video stream");
-            }
-            console.log("Requested video stream from backend");
+            await getVideoMutation.mutateAsync(videoTitle);
         } catch (error) {
             console.error("Error fetching video:", error);
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    async function handleSubmit(e: React.FormEvent) {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        try {
-            setVideoChunks([]);
-            setVideoBlob(null);
-            setReceivedSize(0);
-            setTotalSize(0);
-            setProgress(0);
-            setLoading(true);
-            setErrorMessage("");
-            const response = await fetch(`${serverUrl}/add-video`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url: videoUrl }),
-                credentials: "include",
-            });
+        setLoading(true);
+        setErrorMessage("");
+        setVideoChunks([]);
+        setVideoBlob(null);
+        setReceivedSize(0);
+        setTotalSize(0);
+        setProgress(0);
 
-            if (!response.ok) throw new Error("Failed to add video.");
+        addVideoMutation.mutate(videoUrl);
+    };
 
-            await response.json();
-            setVideoUrl("");
-            refetch();
-        } catch (error) {
-            setErrorMessage("Error adding video. Please try again.");
-        } finally {
-            setLoading(false);
-        }
-    }
+    const handleVideoDelete = (videoTitle: string) => {
+        setLoading(true);
+        setVideoChunks([]);
+        setVideoBlob(null);
+        setReceivedSize(0);
+        setTotalSize(0);
+        setProgress(0);
 
-    async function handleVideoDelete(videoTitle: string) {
-        try {
-            setLoading(true);
-            setVideoChunks([]);
-            setVideoBlob(null);
-            setReceivedSize(0);
-            setTotalSize(0);
-            setProgress(0);
-            const response = await fetch(`${serverUrl}/delete-video/${videoTitle}`, {
-                credentials: "include",
-                method: "POST",
-            });
-            if (!response.ok) {
-                throw new Error("Failed to delete video stream");
-            }
-            console.log("Requested video stream deletion from backend");
-
-            // Remove the deleted video from the list immediately
-            if (videos) {
-                refetch();
-            }
-        } catch (error) {
-            console.error("Error deleting video:", error);
-        } finally {
-            setLoading(false);
-        }
-    }
+        deleteVideoMutation.mutate(videoTitle);
+    };
 
     // Adjust the progress bar to show chunks after 100% is reached
     const calculateProgress = () => {
@@ -220,6 +203,19 @@ function Video() {
     return (
         <>
             <Nav />
+
+            {/* Connected Clients Section */}
+            <div className="absolute top-4 left-4 bg-gray-800 p-4 rounded-lg shadow-lg text-white">
+                <h3 className="text-lg font-semibold">Connected Clients</h3>
+                {usersLoading ? (
+                    <p>Loading...</p>
+                ) : usersError ? (
+                    <p className="text-red-500">Error loading connected users</p>
+                ) : (
+                    <ul>{connectedUsers?.map((user) => <li key={user.username}>{user.username}</li>)}</ul>
+                )}
+            </div>
+
             {/* Input Box */}
             <form onSubmit={handleSubmit} className="mt-4 max-w-lg mx-auto flex gap-2 text-white">
                 <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="Enter YouTube Video URL" className="border p-2 w-full rounded" />
@@ -292,3 +288,5 @@ function Video() {
         </>
     );
 }
+
+export default Video;

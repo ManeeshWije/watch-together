@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use crate::constants::COOKIE_AUTH_SESSION;
-use crate::types::AppState;
+use crate::types::{self, AppState, User};
 use crate::user_queries;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json, Response};
 use axum_extra::extract::CookieJar;
@@ -60,6 +63,49 @@ pub async fn get_user_from_session(
         }
     };
 
-    // Return the user UUID (or the user object if needed)
     Ok(user.uuid)
+}
+
+pub async fn get_connected_users(State(app_state): State<AppState>) -> Json<Vec<types::User>> {
+    // Get the set of connected client IDs from the WebSocket clients map
+    let connected_client_ids: HashSet<String> = {
+        let clients = app_state.web_socket_clients.lock().await;
+        println!("WebSocket clients map contains {} clients", clients.len());
+        clients.keys().cloned().collect()
+    };
+    
+    println!("Found {} connected client IDs", connected_client_ids.len());
+    
+    // Prepare the result vector
+    let mut connected_users = Vec::new();
+    
+    // For each connected client ID (which is a user UUID string)
+    for client_id in connected_client_ids {
+        println!("Processing client ID: {}", client_id);
+        
+        // Parse the client ID string into a UUID
+        match Uuid::parse_str(&client_id) {
+            Ok(user_uuid) => {
+                // Fetch user details from the database
+                match user_queries::fetch_user_by_uuid(&app_state.pool, user_uuid).await {
+                    Ok(user) => {
+                        println!("Found user: {} ({})", user.username, user_uuid);
+                        connected_users.push(User {
+                            uuid: user.uuid,
+                            username: user.username,
+                            email: user.email,
+                            is_admin: user.is_admin,
+                            created_at: user.created_at,
+                            num_uploads: Some(user.num_uploads.unwrap_or_default()),
+                        });
+                    },
+                    Err(e) => println!("Failed to fetch user {}: {:?}", user_uuid, e),
+                }
+            },
+            Err(e) => println!("Failed to parse UUID from client ID {}: {:?}", client_id, e),
+        }
+    }
+    
+    println!("Returning {} connected users", connected_users.len());
+    Json(connected_users)
 }

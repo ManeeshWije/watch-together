@@ -115,6 +115,7 @@ async fn main() {
         .route("/get-video/:title", get(video_handler::get_video))
         .route("/list-videos", get(video_handler::list_videos))
         .route("/delete-video/:title", post(video_handler::delete_video))
+        .route("/users", get(user_handler::get_connected_users))
         .route("/auth/logout", get(auth::logout))
         .route("/auth/session", get(auth::session))
         .route("/auth/google/login", get(auth::login))
