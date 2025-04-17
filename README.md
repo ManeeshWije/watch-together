@@ -29,6 +29,14 @@
 - `npm install`
 - `npm run dev`
 
+### Architecture
+
+- Frontend: TypeScript, React, Tanstack Router, Tanstack Query, Tailwind CSS
+- Backend: Rust, Axum, Tokio, SQLx, AWS S3
+- Database: PostgreSQL
+- Authentication: Google OAuth2
+- Hosting: Self hosted on [homelab](https://github.com/ManeeshWije/homelab)
+
 # TODO
 
 - Don't load the whole video into memory, even though we send by chunks
