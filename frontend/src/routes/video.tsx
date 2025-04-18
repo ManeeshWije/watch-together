@@ -181,6 +181,7 @@ function Video() {
         setProgress(0);
 
         deleteVideoMutation.mutate(videoTitle);
+        setLoading(false);
     };
 
     // Adjust the progress bar to show chunks after 100% is reached

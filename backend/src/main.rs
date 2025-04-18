@@ -55,12 +55,6 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    if let Err(e) = fs::create_dir_all("downloads") {
-        eprintln!("Failed to create downloads directory: {}", e);
-    } else {
-        println!("Downloads directory created or already exists.");
-    }
-
     let aws_s3_bucket = env::var("AWS_S3_BUCKET").unwrap_or_default();
     let pool = connection::connect(env::var("DATABASE_URL").unwrap_or_default())
         .await

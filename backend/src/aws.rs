@@ -149,7 +149,7 @@ pub async fn download_video_upload_s3(
     // we are always gonna prefer a slightly less quality video to perserve space
     let status = Command::new("yt-dlp")
         .arg("-o")
-        .arg(format!("downloads/{}", &title)) // Set output file name
+        .arg(format!("{}", &title)) // Set output file name
         .arg("-f")
         .arg("bestvideo[height<=720]+bestaudio/best[height<=720]")
         .arg(url)
@@ -164,7 +164,7 @@ pub async fn download_video_upload_s3(
     println!("Download complete: {:?}", &title);
 
     // Define the output file name
-    let output_file = format!("downloads/{}.webm", title);
+    let output_file = format!("{}.webm", title);
     // Get file size
     let file_size = fs::metadata(&output_file)?.len();
     let file = File::open(&output_file).await?;
