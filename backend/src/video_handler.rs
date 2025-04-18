@@ -78,6 +78,12 @@ async fn send_video_in_chunks(sender: Sender<Message>, video_bytes: Bytes) {
         sleep(Duration::from_millis(10)).await;
     }
 
+    // Send a completion message after all chunks are sent
+    if sent_bytes >= total_size {
+        let _ = sender.send(Message::Text("COMPLETED".to_string())).await;
+        println!("Sent completion message");
+    }
+
     println!("Finished streaming video");
 }
 

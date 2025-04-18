@@ -25,6 +25,8 @@ function Video() {
     const [_videoBlob, setVideoBlob] = useState<Blob | null>(null);
     const [receivedSize, setReceivedSize] = useState(0);
     const [totalSize, setTotalSize] = useState(0);
+    const [isReceivingBinary, setIsReceivingBinary] = useState(false);
+    const [currentVideoTitle, setCurrentVideoTitle] = useState<string | null>(null);
 
     const {
         data: connectedUsers,
@@ -54,19 +56,24 @@ function Video() {
         onSuccess: () => {
             refetch();
             setVideoUrl("");
+            setLoading(false);
         },
     });
 
     const deleteVideoMutation = useMutation({
         mutationFn: deleteVideo,
         onError: () => setErrorMessage("Error deleting video. Please try again."),
-        onSuccess: () => refetch(),
+        onSuccess: () => {
+            refetch();
+            setLoading(false);
+        },
     });
 
     const getVideoMutation = useMutation({
         mutationFn: getVideo,
         onSuccess: (videoData: VideoData) => {
             setTotalSize(videos?.find((video) => video.title === videoData.title)?.size || 0);
+            setIsReceivingBinary(true);
         },
     });
 
@@ -96,6 +103,13 @@ function Video() {
         }
     }, [socket]);
 
+    // Check if video is fully received
+    useEffect(() => {
+        if (isReceivingBinary && totalSize > 0 && receivedSize >= totalSize) {
+            setIsReceivingBinary(false);
+        }
+    }, [receivedSize, totalSize, isReceivingBinary]);
+
     function handleStringMessage(message: string) {
         const [command, value] = message.split(":");
         switch (command) {
@@ -110,6 +124,9 @@ function Video() {
                 break;
             case "PROGRESS":
                 setProgress(parseFloat(value));
+                break;
+            case "COMPLETED":
+                setIsReceivingBinary(false);
                 break;
             default:
                 console.warn("Unknown command received:", command);
@@ -149,11 +166,14 @@ function Video() {
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
+        setIsReceivingBinary(false);
+        setCurrentVideoTitle(videoTitle);
 
         try {
             await getVideoMutation.mutateAsync(videoTitle);
         } catch (error) {
             console.error("Error fetching video:", error);
+            setIsReceivingBinary(false);
         } finally {
             setLoading(false);
         }
@@ -168,6 +188,7 @@ function Video() {
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
+        setIsReceivingBinary(false);
 
         addVideoMutation.mutate(videoUrl);
     };
@@ -179,9 +200,16 @@ function Video() {
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
+        setIsReceivingBinary(false);
+
+        if (videoTitle === currentVideoTitle) {
+            videoRef.current?.pause();
+            videoRef.current?.removeAttribute("src");
+            videoRef.current?.load();
+            setCurrentVideoTitle(null);
+        }
 
         deleteVideoMutation.mutate(videoTitle);
-        setLoading(false);
     };
 
     // Adjust the progress bar to show chunks after 100% is reached
@@ -195,6 +223,9 @@ function Video() {
         // Once the received size is equal or greater than the total size, display progress as 100%
         return 100;
     };
+
+    // Determine if we should show the spinner
+    const shouldShowSpinner = loading || isReceivingBinary;
 
     if (!authLoading && (authError || !authData?.authenticated)) {
         return <Navigate to="/" />;
@@ -220,7 +251,7 @@ function Video() {
             {/* Input Box */}
             <form onSubmit={handleSubmit} className="mt-4 max-w-lg mx-auto flex gap-2 text-white">
                 <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="Enter YouTube Video URL" className="border p-2 w-full rounded" />
-                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" disabled={loading}>
+                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" disabled={shouldShowSpinner}>
                     Submit
                 </button>
             </form>
@@ -247,45 +278,51 @@ function Video() {
                 </ul>
             </div>
 
-            {/* Video Player */}
-            <div className="p-2 flex flex-col justify-center items-center">
-                <video
-                    className="w-full h-auto max-w-[900px] max-h-[600px]"
-                    ref={videoRef}
-                    controls
-                    onPlay={() => socket?.send("PLAY")}
-                    onPause={() => socket?.send("PAUSE")}
-                    onSeeked={() => {
-                        if (!isSyncing && videoRef.current) {
-                            socket?.send(`TIMESTAMP:${videoRef.current.currentTime * 1000}`);
-                        }
-                    }}
-                />
-                {receivedSize < totalSize && !loading && (
+            {/* Video Player with Loading Overlay */}
+            <div className="p-2 flex flex-col justify-center items-center relative">
+                <div className="relative w-full max-w-[900px]">
+                    <video
+                        className={`w-full h-auto max-h-[600px] ${isReceivingBinary ? "opacity-40" : "opacity-100"} transition-opacity duration-300`}
+                        ref={videoRef}
+                        controls
+                        onPlay={() => socket?.send("PLAY")}
+                        onPause={() => socket?.send("PAUSE")}
+                        onSeeked={() => {
+                            if (!isSyncing && videoRef.current) {
+                                socket?.send(`TIMESTAMP:${videoRef.current.currentTime * 1000}`);
+                            }
+                        }}
+                    />
+
+                    {(shouldShowSpinner || isReceivingBinary) && (
+                        <div className="absolute inset-0 flex items-center justify-center z-50">
+                            <div className="bg-opacity-40 rounded-full p-3">
+                                <Spinner />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Download Progress Bar */}
+                {receivedSize > 0 && totalSize > 0 && (
                     <div className="w-full mt-4">
                         <div className="bg-gray-300 w-full h-2 rounded-full">
                             <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${calculateProgress()}%` }}></div>
                         </div>
-                        <p className="text-center text-gray-400 mt-2">{`Received: ${Math.round(calculateProgress())}%`}</p>
+                        <p className="text-center text-gray-400 mt-2">Received: {Math.round(calculateProgress())}%</p>
                     </div>
                 )}
-                {/* Progress Bar */}
+
+                {/* Upload Progress Bar */}
                 {progress > 0 && progress < 100 && (
                     <div className="w-full mt-4">
                         <div className="bg-gray-300 w-full h-2 rounded-full">
                             <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
                         </div>
-                        <p className="text-center text-gray-400 mt-2">{`Uploading: ${Math.round(progress)}%`}</p>
+                        <p className="text-center text-gray-400 mt-2">Uploading: {Math.round(progress)}%</p>
                     </div>
                 )}
             </div>
-
-            {/* Display the Spinner only if the loading state is true */}
-            {loading && progress === 0 && receivedSize === 0 && errorMessage === "" && (
-                <div className="spinner-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                    <Spinner />
-                </div>
-            )}
         </>
     );
 }

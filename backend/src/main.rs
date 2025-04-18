@@ -31,7 +31,7 @@ use http::{
     HeaderValue, Method,
 };
 use sqlx::PgPool;
-use std::{collections::HashMap, fs, time::Duration};
+use std::{collections::HashMap, time::Duration};
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{
