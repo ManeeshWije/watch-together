@@ -146,6 +146,7 @@ pub async fn download_video_upload_s3(
 ) -> Result<u64, anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
     // Spawn yt-dlp process
+    // we are always gonna prefer a slightly less quality video to perserve space
     let status = Command::new("yt-dlp")
         .arg("-o")
         .arg(format!("downloads/{}", &title)) // Set output file name

@@ -280,7 +280,7 @@ function Video() {
             </div>
 
             {/* Display the Spinner only if the loading state is true */}
-            {loading && progress === 0 && receivedSize === 0 && (
+            {loading && progress === 0 && receivedSize === 0 && errorMessage === "" && (
                 <div className="spinner-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
                     <Spinner />
                 </div>

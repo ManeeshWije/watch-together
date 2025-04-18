@@ -87,6 +87,31 @@ pub async fn add_video(
     Json(payload): Json<AddVideoRequest>,
 ) -> impl IntoResponse {
     let AddVideoRequest { url } = payload;
+    // Fetch the video metadata, including title
+    let video_details = match aws::get_video_metadata(&url).await {
+        Ok(details) => details,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json("Failed to fetch video metadata"),
+            )
+                .into_response();
+        }
+    };
+
+    let title = video_details.title.clone();
+
+    // make sure video is not longer than 1 hour
+    let length = video_details.length_seconds;
+    if length > 3600 {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json("Video size is too large"),
+        )
+            .into_response();
+    }
+
+    // check upload limit on user here
     let user_uuid = match user_handler::get_user_from_session(cookies, &app_state).await {
         Ok(uuid) => uuid,
         Err(response) => return response,
@@ -110,20 +135,6 @@ pub async fn add_video(
         )
             .into_response();
     }
-
-    // Fetch the video metadata, including title
-    let video_details = match aws::get_video_metadata(&url).await {
-        Ok(details) => details,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Failed to fetch video metadata"),
-            )
-                .into_response();
-        }
-    };
-
-    let title = video_details.title.clone();
 
     // Check if the video is already in the database
     match video_queries::get_video(&app_state.pool, &url).await {
