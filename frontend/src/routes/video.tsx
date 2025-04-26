@@ -53,7 +53,10 @@ function Video() {
 
     const addVideoMutation = useMutation({
         mutationFn: addVideo,
-        onError: () => setErrorMessage("Error adding video. Please try again."),
+        onError: () => {
+            setErrorMessage("Error adding video. Please try again.");
+            setLoading(false);
+        },
         onSuccess: () => {
             refetch();
             setVideoUrl("");
@@ -63,7 +66,10 @@ function Video() {
 
     const deleteVideoMutation = useMutation({
         mutationFn: deleteVideo,
-        onError: () => setErrorMessage("Error deleting video. Please try again."),
+        onError: () => {
+            setErrorMessage("Error deleting video. Please try again.");
+            setLoading(false);
+        },
         onSuccess: () => {
             refetch();
             setLoading(false);

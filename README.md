@@ -37,6 +37,8 @@
 - Authentication: Google OAuth2
 - Hosting: Self hosted on [homelab](https://github.com/ManeeshWije/homelab)
 
+![Diagram](./media/watch-together-diagram.png)
+
 # TODO
 
 - Don't load the whole video into memory, even though we send by chunks
