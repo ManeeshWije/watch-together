@@ -32,6 +32,7 @@ function Video() {
         data: connectedUsers,
         error: usersError,
         isLoading: usersLoading,
+        refetch: refetchConnectedUsers,
     } = useQuery<User[], Error>({
         queryKey: ["connectedUsers"],
         queryFn: fetchConnectedUsers,
@@ -127,6 +128,10 @@ function Video() {
                 break;
             case "COMPLETED":
                 setIsReceivingBinary(false);
+                break;
+            case "USER_CONNECTED":
+            case "USER_DISCONNECTED":
+                refetchConnectedUsers();
                 break;
             default:
                 console.warn("Unknown command received:", command);

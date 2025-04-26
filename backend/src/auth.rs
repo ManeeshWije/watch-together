@@ -1,7 +1,7 @@
 use crate::{types, user_queries};
 use anyhow::Context;
 use axum::{
-    extract::{Query, State},
+    extract::{ws::Message, Query, State},
     http::StatusCode,
     response::{ErrorResponse, IntoResponse, Redirect},
     Json,
@@ -214,6 +214,15 @@ pub async fn callback(
         .add(session_cookie);
 
     let redirect_url = get_redirect_url();
+
+    // Send user connected message to allow client to refetch users
+    let connected_message = format!("USER_CONNECTED:{}", user.uuid);
+    if let Err(e) = app_state
+        .broadcast_tx
+        .send(Message::Text(connected_message))
+    {
+        eprintln!("Failed to send user connected message: {}", e);
+    }
     Ok((cookies, Redirect::to(&redirect_url)))
 }
 
@@ -226,6 +235,13 @@ pub async fn logout(
     let Some(session_cookie) = session_cookie else {
         return Err(ErrorResponse::from(StatusCode::UNAUTHORIZED));
     };
+
+    let user = user_queries::fetch_user_by_session_uuid(
+        &app_state.pool,
+        uuid::Uuid::parse_str(session_cookie.value()).unwrap(),
+    )
+    .await
+    .map_err(|_| ErrorResponse::from(StatusCode::INTERNAL_SERVER_ERROR))?;
 
     user_queries::delete_user_session(
         &app_state.pool,
@@ -240,6 +256,14 @@ pub async fn logout(
 
     cookies = cookies.add(remove_session_cookie);
     let redirect_url = get_redirect_url();
+    // Send user disconnected message to allow client to refetch users
+    let disconnected_message = format!("USER_DISCONNECTED:{}", user.uuid);
+    if let Err(e) = app_state
+        .broadcast_tx
+        .send(Message::Text(disconnected_message))
+    {
+        eprintln!("Failed to send user disconnected message: {}", e);
+    }
     Ok((cookies, Redirect::to(&redirect_url)))
 }
 

@@ -154,91 +154,82 @@ async fn handle_socket(socket: WebSocket, app_state: types::AppState, cookies: C
         Err(_) => return, // Handle error within the helper function
     };
 
-    // Create client ID from user UUID
-    let client_id = user_uuid.to_string();
+    // Split the socket into sender and receiver parts
+    let (mut sender, mut receiver) = socket.split();
 
-    // Split the WebSocket
-    let (mut client_tx, mut client_rx) = socket.split();
-
-    // Create a channel for this specific client
+    // Create a channel for this specific user
     let (tx, mut rx) = mpsc::channel::<Message>(100);
 
-    // Keep track of the last message to avoid duplicates
-    let last_message = Arc::new(Mutex::new(None::<String>));
-    let last_message_clone = last_message.clone();
+    // Add the user to the connected clients map
+    {
+        let mut clients = app_state.web_socket_clients.lock().await;
+        clients.insert(user_uuid.clone().to_string(), tx);
+    }
 
-    // Add this client to our clients map
-    app_state
-        .web_socket_clients
-        .lock()
-        .await
-        .insert(client_id.clone(), tx);
+    // Broadcast that a new user has connected
+    broadcast_to_others(
+        &app_state,
+        &user_uuid.to_string(),
+        format!("USER_CONNECTED:{}", user_uuid),
+    )
+    .await;
 
-    // Subscribe to the broadcast channel
-    let mut broadcast_rx = app_state.broadcast_tx.subscribe();
-
-    // Task 1: Forward messages from the mpsc channel to the client's WebSocket
-    let forward_task = tokio::spawn(async move {
-        while let Some(message) = rx.recv().await {
-            if client_tx.send(message).await.is_err() {
-                break;
-            }
-        }
-    });
-
-    // Task 2: Process messages from the client, record last message sent, and broadcast
-    let broadcast_tx = Arc::clone(&app_state.broadcast_tx);
-    let client_id_clone = client_id.clone();
-    let clients = Arc::clone(&app_state.web_socket_clients);
-    let receive_task = tokio::spawn(async move {
-        while let Some(Ok(msg)) = client_rx.next().await {
-            // Process the received message
-            if let Message::Text(text) = &msg {
-                println!("Received message from user {}: {}", client_id_clone, text);
-
-                // Store this message as the last one sent by this client
-                *last_message.lock().await = Some(text.clone());
-            }
-
-            // Broadcast to all clients (including self, we'll filter on receive)
-            if broadcast_tx.send(msg).is_err() {
-                break;
-            }
-        }
-
-        // Remove client from the list on disconnection
-        clients.lock().await.remove(&client_id_clone);
-    });
-
-    // Task 3: Receive broadcast messages, filter out duplicates for this client
-    let clients_clone = Arc::clone(&app_state.web_socket_clients);
-    let broadcast_task = tokio::spawn(async move {
-        while let Ok(msg) = broadcast_rx.recv().await {
-            // Check if this is our own last sent message (to avoid duplicates)
-            let should_forward = match &msg {
+    // Handle incoming messages from this client
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(Ok(message)) = receiver.next().await {
+            match message {
                 Message::Text(text) => {
-                    let last_msg = last_message_clone.lock().await;
-                    last_msg.as_ref().is_none_or(|last| last != text)
+                    // Broadcast the message to all other clients
+                    broadcast_to_others(&app_state, &user_uuid.to_string(), text).await;
                 }
-                _ => true, // Always forward binary messages
-            };
+                Message::Close(_) => {
+                    break;
+                }
+                _ => {} // Ignore other message types
+            }
+        }
 
-            // Forward to client if it's not a duplicate of our last sent message
-            if should_forward {
-                if let Some(sender) = clients_clone.lock().await.get(&client_id) {
-                    if sender.send(msg).await.is_err() {
-                        break;
-                    }
-                }
+        // User disconnected, remove from clients map and broadcast disconnect
+        {
+            let mut clients = app_state.web_socket_clients.lock().await;
+            clients.remove(&user_uuid.to_string());
+        }
+        broadcast_to_others(
+            &app_state,
+            &user_uuid.to_string(),
+            format!("USER_DISCONNECTED:{}", user_uuid),
+        )
+        .await;
+    });
+
+    // Handle outgoing messages to this client
+    let mut send_task = tokio::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            if sender.send(message).await.is_err() {
+                break;
             }
         }
     });
 
-    // Wait for any task to finish
+    // Wait for either task to finish
     tokio::select! {
-        _ = forward_task => {},
-        _ = receive_task => {},
-        _ = broadcast_task => {},
+        _ = &mut recv_task => send_task.abort(),
+        _ = &mut send_task => recv_task.abort(),
+    }
+}
+
+// Helper function to broadcast messages to all clients except the sender
+async fn broadcast_to_others(app_state: &types::AppState, sender_uuid: &str, message: String) {
+    let clients = app_state.web_socket_clients.lock().await;
+
+    for (client_uuid, tx) in clients.iter() {
+        // Don't send the message back to the original sender
+        if client_uuid != sender_uuid {
+            // Clone the message for each client
+            let msg = Message::Text(message.clone());
+            // It's ok if sending fails (client might have disconnected)
+            let _ = tx.send(msg).await;
+        }
     }
 }
 
