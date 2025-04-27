@@ -159,7 +159,8 @@ pub async fn add_video(
         &app_state.aws_s3_bucket,
         &url,
         &title,
-        app_state.broadcast_tx.clone(),
+        app_state.web_socket_clients,
+        user_uuid.to_string(),
     )
     .await
     {

@@ -5,10 +5,11 @@ use aws_sdk_s3::{
 use axum::{body::Bytes, extract::ws::Message};
 use rustube::{Id, VideoDetails, VideoFetcher};
 use std::fs;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use tokio::{io::AsyncReadExt, sync::broadcast::Sender};
+use tokio::sync::{mpsc, Mutex};
 
 const PART_SIZE: usize = 5 * 1024 * 1024; // 5MB
 
@@ -37,7 +38,8 @@ async fn upload_file(
     video_key: String,
     mut file: File,
     file_size: u64,
-    broadcaster: Arc<Sender<Message>>,
+    websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    user_uuid: String,
 ) -> Result<(), anyhow::Error> {
     let create_resp = client
         .create_multipart_upload()
@@ -79,8 +81,9 @@ async fn upload_file(
         let progress_message = format!("PROGRESS: {:.2}%", progress);
 
         // Send the progress message via WebSocket
-        if let Err(e) = broadcaster.send(Message::Text(progress_message)) {
-            eprintln!("Failed to send progress message: {}", e);
+        let clients = websocket_clients.lock().await;
+        if let Some(client_tx) = clients.get(&user_uuid) {
+            let _ = client_tx.send(Message::Text(progress_message)).await;
         }
     }
 
@@ -108,8 +111,11 @@ async fn upload_file(
         );
 
         // Update progress to 100%
-        if let Err(e) = broadcaster.send(Message::Text("PROGRESS: 100.00%".into())) {
-            eprintln!("Failed to send progress message: {}", e);
+        let clients = websocket_clients.lock().await;
+        if let Some(client_tx) = clients.get(&user_uuid) {
+            let _ = client_tx
+                .send(Message::Text("PROGRESS: 100.00%".into()))
+                .await;
         }
     }
 
@@ -142,7 +148,8 @@ pub async fn download_video_upload_s3(
     bucket: &str,
     url: &str,
     title: &str,
-    broadcaster: Arc<Sender<Message>>,
+    websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    user_uuid: String,
 ) -> Result<u64, anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
     // Spawn yt-dlp process
@@ -176,7 +183,8 @@ pub async fn download_video_upload_s3(
         title.to_owned(),
         file,
         file_size,
-        broadcaster,
+        websocket_clients,
+        user_uuid,
     )
     .await;
 

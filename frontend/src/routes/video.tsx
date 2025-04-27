@@ -179,9 +179,10 @@ function Video() {
         setProgress(0);
         setIsReceivingBinary(false);
         setCurrentVideoTitle(videoTitle);
+        console.log(videoTitle);
 
         try {
-            await getVideoMutation.mutateAsync(videoTitle);
+            await getVideoMutation.mutateAsync(encodeURIComponent(videoTitle));
         } catch (error) {
             console.error("Error fetching video:", error);
             setIsReceivingBinary(false);
@@ -220,7 +221,7 @@ function Video() {
             setCurrentVideoTitle(null);
         }
 
-        deleteVideoMutation.mutate(videoTitle);
+        deleteVideoMutation.mutate(encodeURIComponent(videoTitle));
     };
 
     // Adjust the progress bar to show chunks after 100% is reached
