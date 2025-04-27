@@ -9,6 +9,10 @@
 
 # Developing
 
+### Prerequisites
+
+- yt-dlp (will need python3 and ffmpeg)
+
 ### Server
 
 - These env vars must be set in `.env`
