@@ -26,35 +26,52 @@ pub async fn get_video(
         Err(response) => return response,
     };
 
-    match aws::get_object(
-        &app_state.aws_client,
-        &app_state.aws_s3_bucket,
-        video_key.clone(),
-    )
-    .await
-    {
-        Ok(video_data) => {
-            println!("Fetched video: {} ({} bytes)", video_key, video_data.len());
+    // Check if the WebSocket client exists before attempting any S3 operations
+    let sender = {
+        let clients = app_state.web_socket_clients.lock().await;
+        clients.get(&user_uuid.to_string()).cloned()
+    };
 
-            // Retrieve the WebSocket sender from active clients
-            let clients = app_state.web_socket_clients.lock().await;
-            if let Some(sender) = clients.get(&user_uuid.to_string()) {
-                let sender = sender.clone();
-                tokio::spawn(async move {
-                    send_video_in_chunks(sender, video_data).await;
-                });
+    if sender.is_none() {
+        return (StatusCode::NOT_FOUND, Json("WebSocket client not found")).into_response();
+    }
 
-                (StatusCode::OK, Json("Streaming entire video via WebSocket")).into_response()
-            } else {
-                (StatusCode::NOT_FOUND, Json("WebSocket client not found")).into_response()
+    let sender = sender.unwrap();
+
+    // Spawn a separate task for downloading from S3 and streaming
+    let video_key_clone = video_key.clone();
+    tokio::spawn(async move {
+        println!("Started background task to fetch video: {}", video_key);
+
+        match aws::get_object(
+            &app_state.aws_client,
+            &app_state.aws_s3_bucket,
+            video_key_clone,
+        )
+        .await
+        {
+            Ok(video_data) => {
+                println!("Fetched video: {} ({} bytes)", video_key, video_data.len());
+                send_video_in_chunks(sender, video_data).await;
+            }
+            Err(e) => {
+                println!("Failed to fetch video: {:?}", e);
+                let _ = sender
+                    .send(Message::Text(format!(
+                        "ERROR: Failed to retrieve video: {}",
+                        e
+                    )))
+                    .await;
             }
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Failed to retrieve video"),
-        )
-            .into_response(),
-    }
+    });
+
+    // Return immediate response to client that streaming has started
+    (
+        StatusCode::ACCEPTED,
+        Json("Video streaming started via WebSocket"),
+    )
+        .into_response()
 }
 
 // Function to send the video in small chunks to avoid flooding WebSocket
@@ -80,7 +97,9 @@ async fn send_video_in_chunks(sender: Sender<Message>, video_bytes: Bytes) {
 
     // Send a completion message after all chunks are sent
     if sent_bytes >= total_size {
-        let _ = sender.send(Message::Text("COMPLETED".to_string())).await;
+        let _ = sender
+            .send(Message::Text("VIDEO_SEND_COMPLETED".to_string()))
+            .await;
         println!("Sent completion message");
     }
 
@@ -93,6 +112,7 @@ pub async fn add_video(
     Json(payload): Json<AddVideoRequest>,
 ) -> impl IntoResponse {
     let AddVideoRequest { url } = payload;
+
     // Fetch the video metadata, including title
     let video_details = match aws::get_video_metadata(&url).await {
         Ok(details) => details,
@@ -107,7 +127,7 @@ pub async fn add_video(
 
     let title = video_details.title.clone();
 
-    // make sure video is not longer than 1 hour
+    // Ensure video is not longer than 1 hour
     let length = video_details.length_seconds;
     if length > 3600 {
         return (
@@ -117,7 +137,7 @@ pub async fn add_video(
             .into_response();
     }
 
-    // check upload limit on user here
+    // Check upload limit
     let user_uuid = match user_handler::get_user_from_session(cookies, &app_state).await {
         Ok(uuid) => uuid,
         Err(response) => return response,
@@ -142,7 +162,7 @@ pub async fn add_video(
             .into_response();
     }
 
-    // Check if the video is already in the database
+    // Check if video already exists
     match video_queries::get_video(&app_state.pool, &url).await {
         Ok(Some(_)) => {
             return (StatusCode::BAD_REQUEST, Json("Video already exists")).into_response();
@@ -153,40 +173,52 @@ pub async fn add_video(
         }
     }
 
-    // Download and upload the video to S3 first, then get the file size
-    let file_size = match aws::download_video_upload_s3(
-        &app_state.aws_client,
-        &app_state.aws_s3_bucket,
-        &url,
-        &title,
-        app_state.web_socket_clients,
-        user_uuid.to_string(),
-    )
-    .await
-    {
-        Ok(size) => size as i32,
-        Err(e) => {
-            println!("ERROR UPLOADING {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Failed to upload video"),
-            )
-                .into_response();
-        }
-    };
-
-    // Get current timestamp
-    let created_at = Utc::now().naive_utc();
-
-    // Insert video metadata including file size into the database
-    match video_queries::create_video(&app_state.pool, &url, &title, file_size, created_at).await {
-        Ok(_) => (StatusCode::OK, Json("Video added successfully")).into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json("Failed to insert video"),
+    // Now we spin off the S3 upload in a background task
+    tokio::spawn(async move {
+        match aws::download_video_upload_s3(
+            &app_state.aws_client,
+            &app_state.aws_s3_bucket,
+            &url,
+            &title,
+            app_state.web_socket_clients.clone(),
+            user_uuid.to_string(),
         )
-            .into_response(),
-    }
+        .await
+        {
+            Ok(file_size) => {
+                let created_at = Utc::now().naive_utc();
+                if let Err(err) = video_queries::create_video(
+                    &app_state.pool,
+                    &url,
+                    &title,
+                    file_size as i32,
+                    created_at,
+                )
+                .await
+                {
+                    eprintln!("Failed to insert video metadata: {:?}", err);
+                } else {
+                    println!("Successfully uploaded and inserted video: {}", title);
+                    // Send VIDEO_UPLOADED event to client
+                    let clients = app_state.web_socket_clients.lock().await;
+                    if let Some(sender) = clients.get(&user_uuid.to_string()) {
+                        let _ = sender
+                            .send(Message::Text("VIDEO_UPLOADED".to_string()))
+                            .await;
+                        println!("Sent VIDEO_UPLOADED to client: {}", user_uuid.to_string());
+                    } else {
+                        println!("Client not connected for user {}", user_uuid.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to download/upload video: {:?}", e);
+            }
+        }
+    });
+
+    // Return early to user without waiting for upload
+    (StatusCode::OK, Json("Video upload started")).into_response()
 }
 
 pub async fn delete_video(

@@ -58,9 +58,7 @@ function Video() {
             setLoading(false);
         },
         onSuccess: () => {
-            refetch();
             setVideoUrl("");
-            setLoading(false);
         },
     });
 
@@ -132,8 +130,12 @@ function Video() {
             case "PROGRESS":
                 setProgress(parseFloat(value));
                 break;
-            case "COMPLETED":
+            case "VIDEO_SEND_COMPLETED":
                 setIsReceivingBinary(false);
+                break;
+            case "VIDEO_UPLOADED":
+                setLoading(false);
+                refetch();
                 break;
             case "USER_CONNECTED":
             case "USER_DISCONNECTED":
