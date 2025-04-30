@@ -112,6 +112,13 @@ pub async fn add_video(
     Json(payload): Json<AddVideoRequest>,
 ) -> impl IntoResponse {
     let AddVideoRequest { url } = payload;
+    if !url.contains("youtube.com/watch?v=") && !url.contains("youtu.be/") {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json("Only YouTube video URLs are supported"),
+        )
+            .into_response();
+    }
     // Check upload limit
     let user_uuid = match user_handler::get_user_from_session(cookies, &app_state).await {
         Ok(uuid) => uuid,
