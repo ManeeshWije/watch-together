@@ -112,7 +112,10 @@ pub async fn add_video(
     Json(payload): Json<AddVideoRequest>,
 ) -> impl IntoResponse {
     let AddVideoRequest { url } = payload;
-    if !url.contains("youtube.com/watch?v=") && !url.contains("youtu.be/") {
+    if !url.contains("youtube.com/watch?v=")
+        && !url.contains("youtu.be/")
+        && !url.contains("youtube.com/shorts")
+    {
         return (
             StatusCode::BAD_REQUEST,
             Json("Only YouTube video URLs are supported"),
