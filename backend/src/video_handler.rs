@@ -112,31 +112,6 @@ pub async fn add_video(
     Json(payload): Json<AddVideoRequest>,
 ) -> impl IntoResponse {
     let AddVideoRequest { url } = payload;
-
-    // Fetch the video metadata, including title
-    let video_details = match aws::get_video_metadata(&url).await {
-        Ok(details) => details,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json("Failed to fetch video metadata"),
-            )
-                .into_response();
-        }
-    };
-
-    let title = video_details.title.clone();
-
-    // Ensure video is not longer than 1 hour
-    let length = video_details.length_seconds;
-    if length > 3600 {
-        return (
-            StatusCode::PAYLOAD_TOO_LARGE,
-            Json("Video size is too large"),
-        )
-            .into_response();
-    }
-
     // Check upload limit
     let user_uuid = match user_handler::get_user_from_session(cookies, &app_state).await {
         Ok(uuid) => uuid,
@@ -179,13 +154,21 @@ pub async fn add_video(
             &app_state.aws_client,
             &app_state.aws_s3_bucket,
             &url,
-            &title,
             app_state.web_socket_clients.clone(),
             user_uuid.to_string(),
         )
         .await
         {
-            Ok(file_size) => {
+            Ok((file_size, title, duration)) => {
+                // Ensure video is not longer than 1 hour
+                if duration
+                    .parse::<u64>()
+                    .expect("Could not parse duration into u64 from string")
+                    > 3600
+                {
+                    eprintln!("Video too long: {} seconds", duration);
+                    return;
+                }
                 let created_at = Utc::now().naive_utc();
                 if let Err(err) = video_queries::create_video(
                     &app_state.pool,

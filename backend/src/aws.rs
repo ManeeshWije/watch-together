@@ -3,7 +3,6 @@ use aws_sdk_s3::{
     Client,
 };
 use axum::{body::Bytes, extract::ws::Message};
-use rustube::{Id, VideoDetails, VideoFetcher};
 use std::fs;
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::File;
@@ -137,22 +136,40 @@ async fn upload_file(
     Ok(())
 }
 
-pub async fn get_video_metadata(url: &str) -> Result<VideoDetails, anyhow::Error> {
-    let id = Id::from_raw(url)?;
-    let descrambler = VideoFetcher::from_id(id.into_owned())?.fetch().await?;
-    Ok(descrambler.video_details().clone())
-}
-
 pub async fn download_video_upload_s3(
     client: &Client,
     bucket: &str,
     url: &str,
-    title: &str,
     websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
     user_uuid: String,
-) -> Result<u64, anyhow::Error> {
+) -> Result<(u64, String, String), anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
-    // Spawn yt-dlp process
+    let title_output = Command::new("yt-dlp")
+        .arg("--get-title")
+        .arg(url)
+        .output()
+        .await?;
+    if !title_output.status.success() {
+        return Err(anyhow::anyhow!("yt-dlp --get-title failed"));
+    }
+
+    let duration_output = Command::new("yt-dlp")
+        .arg("--print")
+        .arg("duration")
+        .arg(url)
+        .output()
+        .await?;
+    if !duration_output.status.success() {
+        return Err(anyhow::anyhow!("yt-dlp --print duration failed"));
+    }
+
+    let title = String::from_utf8_lossy(&title_output.stdout)
+        .trim()
+        .to_string();
+    let duration = String::from_utf8_lossy(&duration_output.stdout)
+        .trim()
+        .to_string();
+
     // we are always gonna prefer a slightly less quality video to perserve space
     let status = Command::new("yt-dlp")
         .arg("-o")
@@ -160,9 +177,9 @@ pub async fn download_video_upload_s3(
         .arg("-f")
         .arg("bestvideo[height<=720]+bestaudio/best[height<=720]")
         .arg(url)
-        .spawn()? // Spawn the process
+        .spawn()?
         .wait()
-        .await?; // Wait for it to complete
+        .await?;
 
     if !status.success() {
         return Err(anyhow::anyhow!("yt-dlp failed with exit code {:?}", status));
@@ -197,5 +214,5 @@ pub async fn download_video_upload_s3(
         }
     }
 
-    Ok(file_size)
+    Ok((file_size, title, duration))
 }
