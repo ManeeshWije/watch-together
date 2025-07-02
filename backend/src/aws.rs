@@ -173,9 +173,13 @@ pub async fn download_video_upload_s3(
     // we are always gonna prefer a slightly less quality video to perserve space
     let status = Command::new("yt-dlp")
         .arg("-o")
-        .arg(format!("{}", &title)) // Set output file name
+        .arg(format!("{}.mp4", &title))
         .arg("-f")
-        .arg("bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]")
+        .arg("bestvideo[ext=mp4][vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1][height<=720]")
+        .arg("--merge-output-format")
+        .arg("mp4")
+        .arg("--postprocessor-args")
+        .arg("ffmpeg:-movflags +faststart")
         .arg(url)
         .spawn()?
         .wait()
