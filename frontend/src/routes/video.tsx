@@ -8,6 +8,91 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 
 const serverUrl = import.meta.env.MODE === "production" ? "" : "http://localhost:8080";
 
+// IndexedDB utilities
+const DB_NAME = "VideoCache";
+const DB_VERSION = 1;
+const STORE_NAME = "videos";
+
+interface StoredVideo {
+    title: string;
+    blob: Blob;
+    timestamp: number;
+}
+
+const openDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: "title" });
+                store.createIndex("timestamp", "timestamp", { unique: false });
+            }
+        };
+    });
+};
+
+const storeVideoInDB = async (title: string, blob: Blob): Promise<void> => {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    const videoData: StoredVideo = {
+        title,
+        blob,
+        timestamp: Date.now(),
+    };
+
+    return new Promise((resolve, reject) => {
+        const request = store.put(videoData);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+    });
+};
+
+const getVideoFromDB = async (title: string): Promise<Blob | null> => {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+
+    return new Promise((resolve, reject) => {
+        const request = store.get(title);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const result = request.result as StoredVideo | undefined;
+            resolve(result ? result.blob : null);
+        };
+    });
+};
+
+const deleteVideoFromDB = async (title: string): Promise<void> => {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    return new Promise((resolve, reject) => {
+        const request = store.delete(title);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+    });
+};
+
+const checkVideoInDB = async (title: string): Promise<boolean> => {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+
+    return new Promise((resolve, reject) => {
+        const request = store.get(title);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(!!request.result);
+    });
+};
+
 export const Route = createFileRoute("/video")({
     component: Video,
 });
@@ -26,6 +111,7 @@ function Video() {
     const [totalSize, setTotalSize] = useState(0);
     const [isReceivingBinary, setIsReceivingBinary] = useState(false);
     const [currentVideoTitle, setCurrentVideoTitle] = useState<string | null>(null);
+    const [downloadingVideoTitle, setDownloadingVideoTitle] = useState<string | null>(null);
 
     const {
         data: connectedUsers,
@@ -128,7 +214,6 @@ function Video() {
 
     const handleBinaryMessage = useCallback(
         (data: ArrayBuffer) => {
-            // Just accumulate chunks without creating blob each time
             const newChunk = new Uint8Array(data);
             console.log("Received binary chunk:", newChunk.length, "bytes. Total chunks:", videoChunks.length + 1);
             setVideoChunks((prevChunks) => [...prevChunks, newChunk]);
@@ -176,20 +261,59 @@ function Video() {
             condition: !isReceivingBinary && videoChunks.length > 0,
         });
 
-        // Create blob when receiving is complete and we have chunks
-        if (!isReceivingBinary && videoChunks.length > 0) {
+        // Store video in IndexedDB when receiving is complete, then always fetch from there
+        if (!isReceivingBinary && videoChunks.length > 0 && downloadingVideoTitle) {
             const finalBlob = new Blob(videoChunks, { type: "video/mp4" });
             console.log("Final video blob created, size:", finalBlob.size);
-            if (videoRef.current) {
-                console.log("Video fully received, updating video source");
-                videoRef.current.src = URL.createObjectURL(finalBlob);
-            }
-            // Clear chunks after creating blob to avoid recreating it
+
+            // Store in IndexedDB
+            storeVideoInDB(downloadingVideoTitle, finalBlob)
+                .then(() => {
+                    console.log("Video stored in IndexedDB:", downloadingVideoTitle);
+                    // Always fetch from IndexedDB after storing, regardless of which video is selected
+                    return loadVideoFromDB(downloadingVideoTitle);
+                })
+                .catch((error) => {
+                    console.error("Error storing video in IndexedDB:", error);
+                });
+
+            // Clear chunks after storing
             setVideoChunks([]);
+            setDownloadingVideoTitle(null);
         }
-    }, [isReceivingBinary, videoChunks, receivedSize, totalSize]);
+    }, [isReceivingBinary, videoChunks, receivedSize, totalSize, downloadingVideoTitle]);
+
+    const loadVideoFromDB = async (videoTitle: string) => {
+        try {
+            const videoBlob = await getVideoFromDB(videoTitle);
+            if (videoBlob && videoRef.current) {
+                console.log("Loading video from IndexedDB:", videoTitle);
+                // Revoke previous object URL to prevent memory leaks
+                if (videoRef.current.src && videoRef.current.src.startsWith("blob:")) {
+                    URL.revokeObjectURL(videoRef.current.src);
+                }
+                videoRef.current.src = URL.createObjectURL(videoBlob);
+                setCurrentVideoTitle(videoTitle);
+            }
+        } catch (error) {
+            console.error("Error loading video from IndexedDB:", error);
+        }
+    };
 
     const handleVideoClick = async (videoTitle: string) => {
+        // First check if video is already in IndexedDB
+        try {
+            const isInDB = await checkVideoInDB(videoTitle);
+            if (isInDB) {
+                console.log("Video found in IndexedDB, loading directly");
+                await loadVideoFromDB(videoTitle);
+                return;
+            }
+        } catch (error) {
+            console.error("Error checking IndexedDB:", error);
+        }
+
+        // Video not in DB, need to download it
         setLoading(true);
         setVideoChunks([]);
         setReceivedSize(0);
@@ -197,13 +321,15 @@ function Video() {
         setProgress(0);
         setIsReceivingBinary(false);
         setCurrentVideoTitle(videoTitle);
-        console.log(videoTitle);
+        setDownloadingVideoTitle(videoTitle);
+        console.log("Downloading video:", videoTitle);
 
         try {
             await getVideoMutation.mutateAsync(encodeURIComponent(videoTitle));
         } catch (error) {
             console.error("Error fetching video:", error);
             setIsReceivingBinary(false);
+            setDownloadingVideoTitle(null);
         } finally {
             setLoading(false);
         }
@@ -222,7 +348,7 @@ function Video() {
         addVideoMutation.mutate(videoUrl);
     };
 
-    const handleVideoDelete = (videoTitle: string) => {
+    const handleVideoDelete = async (videoTitle: string) => {
         setLoading(true);
         setVideoChunks([]);
         setReceivedSize(0);
@@ -230,7 +356,19 @@ function Video() {
         setProgress(0);
         setIsReceivingBinary(false);
 
+        // Remove from IndexedDB
+        try {
+            await deleteVideoFromDB(videoTitle);
+            console.log("Video deleted from IndexedDB:", videoTitle);
+        } catch (error) {
+            console.error("Error deleting video from IndexedDB:", error);
+        }
+
         if (videoTitle === currentVideoTitle) {
+            // Revoke object URL before clearing
+            if (videoRef.current?.src && videoRef.current.src.startsWith("blob:")) {
+                URL.revokeObjectURL(videoRef.current.src);
+            }
             videoRef.current?.pause();
             videoRef.current?.removeAttribute("src");
             videoRef.current?.load();
@@ -239,6 +377,15 @@ function Video() {
 
         deleteVideoMutation.mutate(encodeURIComponent(videoTitle));
     };
+
+    // Clean up object URLs when component unmounts
+    useEffect(() => {
+        return () => {
+            if (videoRef.current?.src && videoRef.current.src.startsWith("blob:")) {
+                URL.revokeObjectURL(videoRef.current.src);
+            }
+        };
+    }, []);
 
     // Adjust the progress bar to show chunks after 100% is reached
     const calculateProgress = () => {
