@@ -258,7 +258,11 @@ function Video() {
                 ) : usersError ? (
                     <p className="text-red-500">Error loading connected users</p>
                 ) : (
-                    <ul>{connectedUsers?.map((user) => <li key={user.username}>{user.username}</li>)}</ul>
+                    <ul>
+                        {connectedUsers?.map((user) => (
+                            <li key={user.username}>{user.username}</li>
+                        ))}
+                    </ul>
                 )}
             </div>
 

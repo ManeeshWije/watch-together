@@ -176,6 +176,8 @@ pub async fn download_video_upload_s3(
         .arg(format!("{}", &title)) // Set output file name
         .arg("-f")
         .arg("bestvideo[height<=720]+bestaudio/best[height<=720]")
+        .arg("-S")
+        .arg("ext")
         .arg(url)
         .spawn()?
         .wait()
@@ -188,7 +190,7 @@ pub async fn download_video_upload_s3(
     println!("Download complete: {:?}", &title);
 
     // Define the output file name
-    let output_file = format!("{}.webm", title);
+    let output_file = format!("{}.mp4", title);
     // Get file size
     let file_size = fs::metadata(&output_file)?.len();
     let file = File::open(&output_file).await?;
