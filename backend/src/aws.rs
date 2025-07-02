@@ -44,7 +44,7 @@ async fn upload_file(
         .create_multipart_upload()
         .bucket(&bucket)
         .key(&video_key)
-        .content_type("video/webm")
+        .content_type("video/mp4")
         .send()
         .await?;
     let upload_id = create_resp.upload_id().unwrap().to_string();
@@ -175,9 +175,7 @@ pub async fn download_video_upload_s3(
         .arg("-o")
         .arg(format!("{}", &title)) // Set output file name
         .arg("-f")
-        .arg("bestvideo[height<=720]+bestaudio/best[height<=720]")
-        .arg("-S")
-        .arg("ext")
+        .arg("bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]")
         .arg(url)
         .spawn()?
         .wait()
