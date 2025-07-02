@@ -76,7 +76,7 @@ pub async fn get_video(
 
 // Function to send the video in small chunks to avoid flooding WebSocket
 async fn send_video_in_chunks(sender: Sender<Message>, video_bytes: Bytes) {
-    let chunk_size = 5 * 1024 * 1024; // 5MB chunks
+    let chunk_size = 10 * 1024 * 1024; // 10MB chunks
     let total_size = video_bytes.len();
     let mut sent_bytes = 0;
 

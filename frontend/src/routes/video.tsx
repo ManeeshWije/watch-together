@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import Nav from "../components/Nav";
 import { addVideo, deleteVideo, fetchVideos, getVideo, useAuthQuery, fetchConnectedUsers } from "../utils";
@@ -21,8 +21,7 @@ function Video() {
     const [videoUrl, setVideoUrl] = useState("");
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
-    const [_videoChunks, setVideoChunks] = useState<Uint8Array[]>([]);
-    const [_videoBlob, setVideoBlob] = useState<Blob | null>(null);
+    const [videoChunks, setVideoChunks] = useState<Uint8Array[]>([]);
     const [receivedSize, setReceivedSize] = useState(0);
     const [totalSize, setTotalSize] = useState(0);
     const [isReceivingBinary, setIsReceivingBinary] = useState(false);
@@ -82,6 +81,66 @@ function Video() {
         },
     });
 
+    const syncVideoTime = useCallback(
+        (timestamp: number) => {
+            if (!isSyncing && videoRef.current) {
+                setIsSyncing(true);
+                videoRef.current.currentTime = timestamp / 1000;
+                setTimeout(() => setIsSyncing(false), 500);
+            }
+        },
+        [isSyncing],
+    );
+
+    const handleStringMessage = useCallback(
+        (message: string) => {
+            const [command, value] = message.split(":");
+            switch (command) {
+                case "TIMESTAMP":
+                    syncVideoTime(parseFloat(value));
+                    break;
+                case "PLAY":
+                    videoRef.current?.play();
+                    break;
+                case "PAUSE":
+                    videoRef.current?.pause();
+                    break;
+                case "PROGRESS":
+                    setProgress(parseFloat(value));
+                    break;
+                case "VIDEO_SEND_COMPLETED":
+                    setIsReceivingBinary(false);
+                    break;
+                case "VIDEO_UPLOADED":
+                    setLoading(false);
+                    refetch();
+                    break;
+                case "USER_CONNECTED":
+                case "USER_DISCONNECTED":
+                    refetchConnectedUsers();
+                    break;
+                default:
+                    console.warn("Unknown command received:", command);
+            }
+        },
+        [syncVideoTime, refetch, refetchConnectedUsers],
+    );
+
+    const handleBinaryMessage = useCallback(
+        (data: ArrayBuffer) => {
+            // Just accumulate chunks without creating blob each time
+            const newChunk = new Uint8Array(data);
+            console.log("Received binary chunk:", newChunk.length, "bytes. Total chunks:", videoChunks.length + 1);
+            setVideoChunks((prevChunks) => [...prevChunks, newChunk]);
+            setReceivedSize((prevSize) => {
+                const newSize = prevSize + newChunk.length;
+                console.log("Updated received size:", newSize, "of", totalSize);
+                return newSize;
+            });
+        },
+        [videoChunks.length, totalSize],
+    );
+
     useEffect(() => {
         if (!socket) {
             const newSocket = new WebSocket(`${serverUrl}/ws`);
@@ -106,76 +165,33 @@ function Video() {
                 }
             };
         }
-    }, [socket]);
+    }, [socket, handleStringMessage, handleBinaryMessage]);
 
-    // Check if video is fully received
     useEffect(() => {
-        if (isReceivingBinary && totalSize > 0 && receivedSize >= totalSize) {
-            setIsReceivingBinary(false);
-        }
-    }, [receivedSize, totalSize, isReceivingBinary]);
-
-    function handleStringMessage(message: string) {
-        const [command, value] = message.split(":");
-        switch (command) {
-            case "TIMESTAMP":
-                syncVideoTime(parseFloat(value));
-                break;
-            case "PLAY":
-                videoRef.current?.play();
-                break;
-            case "PAUSE":
-                videoRef.current?.pause();
-                break;
-            case "PROGRESS":
-                setProgress(parseFloat(value));
-                break;
-            case "VIDEO_SEND_COMPLETED":
-                setIsReceivingBinary(false);
-                break;
-            case "VIDEO_UPLOADED":
-                setLoading(false);
-                refetch();
-                break;
-            case "USER_CONNECTED":
-            case "USER_DISCONNECTED":
-                refetchConnectedUsers();
-                break;
-            default:
-                console.warn("Unknown command received:", command);
-        }
-    }
-
-    function handleBinaryMessage(data: ArrayBuffer) {
-        // Convert the incoming chunk (ArrayBuffer) to Uint8Array and append it
-        const newChunk = new Uint8Array(data);
-        setVideoChunks((prevChunks) => {
-            const updatedChunks = [...prevChunks, newChunk];
-            const combinedBlob = new Blob(updatedChunks, { type: "video/webm" });
-            setVideoBlob(combinedBlob); // Update the video Blob
-            setReceivedSize((prevSize) => prevSize + newChunk.length);
-
-            // Update the video URL only when a new Blob is ready
-            if (videoRef.current) {
-                videoRef.current.src = URL.createObjectURL(combinedBlob);
-            }
-
-            return updatedChunks;
+        console.log("Video blob effect triggered:", {
+            isReceivingBinary,
+            totalSize,
+            receivedSize,
+            videoChunksLength: videoChunks.length,
+            condition: !isReceivingBinary && videoChunks.length > 0,
         });
-    }
 
-    function syncVideoTime(timestamp: number) {
-        if (!isSyncing && videoRef.current) {
-            setIsSyncing(true);
-            videoRef.current.currentTime = timestamp / 1000;
-            setTimeout(() => setIsSyncing(false), 500);
+        // Create blob when receiving is complete and we have chunks
+        if (!isReceivingBinary && videoChunks.length > 0) {
+            const finalBlob = new Blob(videoChunks, { type: "video/mp4" });
+            console.log("Final video blob created, size:", finalBlob.size);
+            if (videoRef.current) {
+                console.log("Video fully received, updating video source");
+                videoRef.current.src = URL.createObjectURL(finalBlob);
+            }
+            // Clear chunks after creating blob to avoid recreating it
+            setVideoChunks([]);
         }
-    }
+    }, [isReceivingBinary, videoChunks, receivedSize, totalSize]);
 
     const handleVideoClick = async (videoTitle: string) => {
         setLoading(true);
         setVideoChunks([]);
-        setVideoBlob(null);
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
@@ -198,7 +214,6 @@ function Video() {
         setLoading(true);
         setErrorMessage("");
         setVideoChunks([]);
-        setVideoBlob(null);
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
@@ -210,7 +225,6 @@ function Video() {
     const handleVideoDelete = (videoTitle: string) => {
         setLoading(true);
         setVideoChunks([]);
-        setVideoBlob(null);
         setReceivedSize(0);
         setTotalSize(0);
         setProgress(0);
@@ -258,11 +272,7 @@ function Video() {
                 ) : usersError ? (
                     <p className="text-red-500">Error loading connected users</p>
                 ) : (
-                    <ul>
-                        {connectedUsers?.map((user) => (
-                            <li key={user.username}>{user.username}</li>
-                        ))}
-                    </ul>
+                    <ul>{connectedUsers?.map((user) => <li key={user.username}>{user.username}</li>)}</ul>
                 )}
             </div>
 
