@@ -170,11 +170,11 @@ pub async fn add_video(
         .await
         {
             Ok((file_size, title, duration)) => {
-                // Ensure video is not longer than 1 hour
+                // Ensure video is not longer than 1:30 hours
                 if duration
                     .parse::<u64>()
                     .expect("Could not parse duration into u64 from string")
-                    > 3600
+                    > 5400
                 {
                     eprintln!("Video too long: {} seconds", duration);
                     return;
