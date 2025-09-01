@@ -29,6 +29,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/bin/yt-dlp
 RUN chmod +x /usr/bin/yt-dlp
+RUN yt-dlp --update-to nightly
 COPY --from=rbuilder /backend/target/release/watch-together .
 COPY --from=jbuilder /frontend/dist/ dist/
 EXPOSE 8080
