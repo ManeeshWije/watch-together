@@ -14,7 +14,7 @@ COPY frontend .
 RUN npm install
 RUN npm run build
 
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS release
+FROM --platform=$TARGETPLATFORM debian:trixie-slim AS release
 WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
