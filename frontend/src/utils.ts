@@ -1,84 +1,70 @@
 import { useQuery } from "@tanstack/react-query";
 import { AuthResponse, User, VideoData } from "./types";
 
-const serverUrl = import.meta.env.MODE === "production" ? "" : "http://localhost:8080";
+const API_URL =
+  import.meta.env.MODE === "production"
+    ? ""
+    : "http://localhost:8080";
 
-const fetchAuthSession = async (): Promise<AuthResponse> => {
-    const response = await fetch(`${serverUrl}/auth/session`, {
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to fetch auth session");
-    }
-    console.log("Fetched auth session successfully");
-    return response.json();
-};
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    ...options,
+  });
 
-export const fetchVideos = async (): Promise<VideoData[]> => {
-    const response = await fetch(`${serverUrl}/list-videos`, {
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to fetch videos");
-    }
-    console.log("Fetched all videos successfully");
-    return response.json();
-};
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Request failed");
+  }
 
-export const fetchConnectedUsers = async (): Promise<User[]> => {
-    const response = await fetch(`${serverUrl}/users`, {
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to fetch all connected users");
-    }
-    console.log("Connected users successfully fetched");
-    return response.json();
-};
+  const data: unknown = await response.json();
 
-export const getVideo = async (videoTitle: string): Promise<VideoData> => {
-    const response = await fetch(`${serverUrl}/get-video/${videoTitle}`, {
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to request video stream");
-    }
-    console.log("Video successfully fetched");
-    return response.json();
-};
+  return data as T;
+}
 
-export const addVideo = async (videoUrl: string) => {
-    const response = await fetch(`${serverUrl}/add-video`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: videoUrl }),
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to add video.");
-    }
-    console.log("Video successfully added");
-    return response.json();
-};
+// Auth
+export const fetchAuthSession = () =>
+  apiFetch<AuthResponse>("/auth/session");
 
-export const deleteVideo = async (videoTitle: string) => {
-    const response = await fetch(`${serverUrl}/delete-video/${videoTitle}`, {
-        credentials: "include",
-        method: "POST",
-    });
-    if (!response.ok) {
-        throw new Error("Failed to delete video stream");
+// Videos
+export const fetchVideos = () =>
+  apiFetch<VideoData[]>("/list-videos");
+
+export const getVideo = (videoTitle: string) =>
+  apiFetch<VideoData>(
+    `/get-video/${encodeURIComponent(videoTitle)}`
+  );
+
+export const addVideo = (videoUrl: string) =>
+  apiFetch<VideoData>("/add-video", {
+    method: "POST",
+    body: JSON.stringify({ url: videoUrl }),
+  });
+
+export const deleteVideo = (videoTitle: string) =>
+  apiFetch<void>(
+    `/delete-video/${encodeURIComponent(videoTitle)}`,
+    {
+      method: "POST",
     }
-    console.log("Requested video stream deletion from backend");
-    return response.json();
-};
+  );
+
+// Users
+export const fetchConnectedUsers = () =>
+  apiFetch<User[]>("/users");
 
 export const useAuthQuery = () => {
-    return useQuery({
-        queryKey: ["authSession"],
-        queryFn: fetchAuthSession,
-        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-        retry: false, // Don't retry failed requests
-    });
+  return useQuery({
+    queryKey: ["authSession"],
+    queryFn: fetchAuthSession,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: false,
+  });
 };
-
