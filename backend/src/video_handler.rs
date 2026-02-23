@@ -5,7 +5,7 @@ use crate::{
 };
 use axum::{
     body::Bytes,
-    extract::{ws::Message, Path, State},
+    extract::{Path, State, ws::Message},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
@@ -13,12 +13,30 @@ use axum_extra::extract::CookieJar;
 use chrono::Utc;
 use std::time::Duration;
 use tokio::{sync::mpsc::Sender, time::sleep};
+use urlencoding::decode;
+
+fn decode_video_key(encoded_key: &str) -> Result<String, String> {
+    decode(encoded_key)
+        .map(|cow| cow.into_owned())
+        .map_err(|e| format!("Failed to decode video key: {}", e))
+}
 
 pub async fn get_video(
     cookies: CookieJar,
     Path(video_key): Path<String>,
     State(app_state): State<AppState>,
 ) -> Response {
+    let video_key = match decode_video_key(&video_key) {
+        Ok(key) => key,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json("Invalid video title encoding"),
+            )
+                .into_response();
+        }
+    };
+
     println!("Requested video: {:?}", video_key);
 
     let user_uuid = match user_handler::get_user_from_session(cookies, &app_state).await {
@@ -218,6 +236,16 @@ pub async fn delete_video(
     State(app_state): State<AppState>,
     Path(title): Path<String>,
 ) -> impl IntoResponse {
+    let title = match decode_video_key(&title) {
+        Ok(key) => key,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json("Invalid video title encoding"),
+            )
+                .into_response();
+        }
+    };
     // Delete video from the database
     match video_queries::delete_video(&app_state.pool, &title).await {
         Ok(_) => {
