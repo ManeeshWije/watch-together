@@ -12,31 +12,32 @@ mod video_queries;
 use aws_config::load_from_env;
 use aws_sdk_s3::Client;
 use axum::{
+    Router,
     body::Body,
     extract::{
-        ws::{Message, WebSocket},
         State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
     },
     middleware::from_fn_with_state,
     response::{Redirect, Response},
     routing::{get, post},
-    Router,
 };
 use axum_extra::extract::CookieJar;
 use dotenv::dotenv;
 use futures::SinkExt;
 use futures_util::StreamExt;
 use http::{
-    header::{CONNECTION, CONTENT_TYPE, UPGRADE},
     HeaderValue, Method,
+    header::{CONNECTION, CONTENT_TYPE, UPGRADE},
 };
 use sqlx::PgPool;
 use std::{collections::HashMap, time::Duration};
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{
+        Mutex,
         broadcast::{self},
-        mpsc, Mutex,
+        mpsc,
     },
     time::interval,
 };
@@ -125,8 +126,15 @@ async fn main() {
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         );
 
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a valid u16");
+
     // run it with hyper
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port)))
+        .await
+        .unwrap();
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(
         listener,
