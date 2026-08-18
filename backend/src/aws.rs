@@ -226,10 +226,17 @@ pub async fn download_video_upload_s3(
     url: &str,
     websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
     user_uuid: String,
+    cookies: String
 ) -> Result<(u64, String, String), anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
 
+    let cookie_path = format!("/tmp/youtube-cookies-{}.txt", user_uuid);
+
+    tokio::fs::write(&cookie_path, &cookies).await?;
+
     let title_output = Command::new("yt-dlp")
+        .arg("--cookies")
+        .arg(&cookie_path)
         .arg("--get-title")
         .arg(url)
         .output()
@@ -243,6 +250,8 @@ pub async fn download_video_upload_s3(
     }
 
     let duration_output = Command::new("yt-dlp")
+        .arg("--cookies")
+        .arg(&cookie_path)
         .arg("--print")
         .arg("duration")
         .arg(url)
@@ -285,6 +294,8 @@ pub async fn download_video_upload_s3(
     let output_file = format!("{}.mp4", title);
 
     let output = Command::new("yt-dlp")
+        .arg("--cookies")
+        .arg(&cookie_path)
         .arg("-v")
         .arg("--no-playlist")
         .arg("-o")

@@ -43,6 +43,7 @@ pub struct AppState {
     pub aws_client: Client,
     pub pool: PgPool,
     pub rate_limiter: SharedRateLimiter,
+    pub cookies: String
 }
 
 // What we get back from Google

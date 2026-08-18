@@ -184,6 +184,7 @@ pub async fn add_video(
             &url,
             app_state.web_socket_clients.clone(),
             user_uuid.to_string(),
+            app_state.cookies
         )
         .await
         {
