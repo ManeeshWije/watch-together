@@ -67,7 +67,7 @@ RUN curl -fsSL https://deno.land/install.sh | sh \
 # ----------------------------
 # Install pinned yt-dlp
 # ----------------------------
-ARG YTDLP_VERSION=2026.06.09
+ARG YTDLP_VERSION=2026.07.04
 
 RUN curl -fL \
     "https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp" \
