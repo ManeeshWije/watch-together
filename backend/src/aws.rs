@@ -226,13 +226,22 @@ pub async fn download_video_upload_s3(
     url: &str,
     websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
     user_uuid: String,
-    cookies: String
 ) -> Result<(u64, String, String), anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
 
-    let cookie_path = format!("/tmp/youtube-cookies-{}.txt", user_uuid);
+    // let cookie_path = format!("/tmp/youtube-cookies-{}.txt", user_uuid);
+    //
+    // tokio::fs::write(&cookie_path, &cookies).await?;
 
-    tokio::fs::write(&cookie_path, &cookies).await?;
+    use base64::{engine::general_purpose, Engine as _};
+
+    let encoded = std::env::var("YT_COOKIES_B64")?;
+
+    let decoded = general_purpose::STANDARD.decode(encoded)?;
+
+    let cookie_path = "/tmp/youtube-cookies.txt";
+
+    tokio::fs::write(cookie_path, decoded).await?;
 
     let title_output = Command::new("yt-dlp")
         .arg("--cookies")

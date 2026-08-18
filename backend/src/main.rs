@@ -56,7 +56,6 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let cookies = env::var("YT_COOKIES").unwrap_or_default();
     let aws_s3_bucket = env::var("AWS_S3_BUCKET").unwrap_or_default();
     let pool = connection::connect(env::var("DATABASE_URL").unwrap_or_default())
         .await
@@ -82,7 +81,6 @@ async fn main() {
         aws_client: s3,
         pool,
         rate_limiter,
-        cookies,
     };
 
     let dist_dir = if cfg!(debug_assertions) {
