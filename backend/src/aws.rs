@@ -136,90 +136,6 @@ async fn upload_file(
     Ok(())
 }
 
-// pub async fn download_video_upload_s3(
-//     client: &Client,
-//     bucket: &str,
-//     url: &str,
-//     websocket_clients: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
-//     user_uuid: String,
-// ) -> Result<(u64, String, String), anyhow::Error> {
-//     println!("Starting yt-dlp download for URL: {:?}", url);
-//     let title_output = Command::new("yt-dlp")
-//         .arg("--get-title")
-//         .arg(url)
-//         .output()
-//         .await?;
-//     if !title_output.status.success() {
-//         return Err(anyhow::anyhow!("yt-dlp --get-title failed"));
-//     }
-//
-//     let duration_output = Command::new("yt-dlp")
-//         .arg("--print")
-//         .arg("duration")
-//         .arg(url)
-//         .output()
-//         .await?;
-//     if !duration_output.status.success() {
-//         return Err(anyhow::anyhow!("yt-dlp --print duration failed"));
-//     }
-//
-//     let title = String::from_utf8_lossy(&title_output.stdout)
-//         .trim()
-//         .to_string();
-//     let duration = String::from_utf8_lossy(&duration_output.stdout)
-//         .trim()
-//         .to_string();
-//
-//     // we are always gonna prefer a slightly less quality video to perserve space
-//     let status = Command::new("yt-dlp")
-//         .arg("-o")
-//         .arg(format!("{}.mp4", &title))
-//         .arg("-f")
-//         .arg("bestvideo[ext=mp4][vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1][height<=720]")
-//         .arg("--merge-output-format")
-//         .arg("mp4")
-//         .arg("--postprocessor-args")
-//         .arg("ffmpeg:-movflags +faststart")
-//         .arg(url)
-//         .spawn()?
-//         .wait()
-//         .await?;
-//
-//     if !status.success() {
-//         return Err(anyhow::anyhow!("yt-dlp failed with exit code {:?}", status));
-//     }
-//
-//     println!("Download complete: {:?}", &title);
-//
-//     // Define the output file name
-//     let output_file = format!("{}.mp4", title);
-//     // Get file size
-//     let file_size = fs::metadata(&output_file)?.len();
-//     let file = File::open(&output_file).await?;
-//
-//     // Upload to S3
-//     let upload_result = upload_file(
-//         client,
-//         bucket.to_string(),
-//         title.to_owned(),
-//         file,
-//         file_size,
-//         websocket_clients,
-//         user_uuid,
-//     )
-//     .await;
-//
-//     // Delete file after upload
-//     if upload_result.is_ok() {
-//         if let Err(err) = tokio::fs::remove_file(&output_file).await {
-//             eprintln!("Failed to delete file {}: {:?}", output_file, err);
-//         } else {
-//             println!("Deleted local file: {}", output_file);
-//         }
-//     }
-//
-//     Ok((file_size, title, duration))
-// }
 pub async fn download_video_upload_s3(
     client: &Client,
     bucket: &str,
@@ -228,10 +144,6 @@ pub async fn download_video_upload_s3(
     user_uuid: String,
 ) -> Result<(u64, String, String), anyhow::Error> {
     println!("Starting yt-dlp download for URL: {:?}", url);
-
-    // let cookie_path = format!("/tmp/youtube-cookies-{}.txt", user_uuid);
-    //
-    // tokio::fs::write(&cookie_path, &cookies).await?;
 
     use base64::{engine::general_purpose, Engine as _};
 
