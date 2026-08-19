@@ -312,6 +312,26 @@ let output = if high_quality.status.success() {
 
     println!("Download complete: {:?}", &title);
 
+let probe = Command::new("ffprobe")
+    .args([
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height,codec_name,bit_rate",
+        "-of",
+        "default=noprint_wrappers=1",
+        &output_file,
+    ])
+    .output()
+    .await?;
+
+println!(
+    "FINAL VIDEO INFO:\n{}",
+    String::from_utf8_lossy(&probe.stdout)
+);
+
     let file_size = fs::metadata(&output_file)?.len();
     let file = File::open(&output_file).await?;
 
