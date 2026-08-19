@@ -136,6 +136,25 @@ async fn upload_file(
     Ok(())
 }
 
+fn yt_dlp_command(
+    cookie_path: &str,
+    pot_provider_url: &str,
+) -> Command {
+    let mut cmd = Command::new("yt-dlp");
+
+    cmd.arg("--cookies")
+        .arg(cookie_path)
+        .arg("--extractor-args")
+        .arg("youtube:player_client=mweb")
+        .arg("--extractor-args")
+        .arg(format!(
+            "youtubepot-bgutilhttp:base_url={}",
+            pot_provider_url
+        ));
+
+    cmd
+}
+
 pub async fn download_video_upload_s3(
     client: &Client,
     bucket: &str,
@@ -148,6 +167,7 @@ pub async fn download_video_upload_s3(
     use base64::{engine::general_purpose, Engine as _};
 
     let encoded = std::env::var("YT_COOKIES_B64")?;
+    let pot_provider_url = std::env::var("YT_POT_PROVIDER_URL")?;
 
     let decoded = general_purpose::STANDARD.decode(encoded)?;
 
@@ -155,9 +175,10 @@ pub async fn download_video_upload_s3(
 
     tokio::fs::write(cookie_path, decoded).await?;
 
-    let title_output = Command::new("yt-dlp")
-        .arg("--cookies")
-        .arg(&cookie_path)
+    let title_output = yt_dlp_command(
+        cookie_path,
+        &pot_provider_url,
+    )
         .arg("--get-title")
         .arg(url)
         .output()
@@ -170,9 +191,10 @@ pub async fn download_video_upload_s3(
         ));
     }
 
-    let duration_output = Command::new("yt-dlp")
-        .arg("--cookies")
-        .arg(&cookie_path)
+    let duration_output = yt_dlp_command(
+        cookie_path,
+        &pot_provider_url,
+    )
         .arg("--print")
         .arg("duration")
         .arg(url)
@@ -194,35 +216,39 @@ pub async fn download_video_upload_s3(
         .trim()
         .to_string();
 
-    // Avoid problematic direct HTTPS formats where possible.
-    //
-    // First preference:
-    //   <=720p HLS video + audio
-    //
-    // Fallback:
-    //   <=720p AVC MP4 + M4A
-    //
-    // Final fallback:
-    //   any <=720p format
-    let format = concat!(
-        "bestvideo[height<=720][protocol*=m3u8]+bestaudio/",
-        "best[height<=720][protocol*=m3u8]/",
-        "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/",
-        "best[ext=mp4][height<=720]/",
-        "best[height<=720]"
-    );
-
     let output_file = format!("{}.mp4", title);
 
-    let output = Command::new("yt-dlp")
-        .arg("--cookies")
-        .arg(&cookie_path)
+    // let output = Command::new("yt-dlp")
+    //     .arg("--cookies")
+    //     .arg(&cookie_path)
+    //     .arg("-v")
+    //     .arg("--no-playlist")
+    //     .arg("-o")
+    //     .arg(&output_file)
+    //     .arg("-f")
+    //     .arg(format)
+    //     .arg("--merge-output-format")
+    //     .arg("mp4")
+    //     .arg("--postprocessor-args")
+    //     .arg("ffmpeg:-movflags +faststart")
+    //     .arg(url)
+    //     .output()
+    //     .await?;
+    let output = yt_dlp_command(
+        cookie_path,
+        &pot_provider_url,
+    )
         .arg("-v")
         .arg("--no-playlist")
         .arg("-o")
         .arg(&output_file)
         .arg("-f")
-        .arg(format)
+        .arg(
+            "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+\
+            bestaudio[ext=m4a]/\
+            best[ext=mp4][height<=720]/\
+            best[height<=720]"
+        )
         .arg("--merge-output-format")
         .arg("mp4")
         .arg("--postprocessor-args")

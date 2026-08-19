@@ -133,6 +133,7 @@
             paths = [
               pkgs.cacert
               pkgs.yt-dlp
+              pkgs.python314Packages.bgutil-ytdlp-pot-provider
               pkgs.python3
               pkgs.deno
               pkgs.ffmpeg-headless
