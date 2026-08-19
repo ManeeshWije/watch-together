@@ -145,7 +145,7 @@ fn yt_dlp_command(
     cmd.arg("--cookies")
         .arg(cookie_path)
         .arg("--extractor-args")
-        .arg("youtube:player_client=web_safari,mweb")
+        .arg("youtube:player_client=mweb")
         .arg("--extractor-args")
         .arg(format!(
             "youtubepot-bgutilhttp:base_url={}",
@@ -234,7 +234,40 @@ pub async fn download_video_upload_s3(
     //     .arg(url)
     //     .output()
     //     .await?;
-    let output = yt_dlp_command(
+let high_quality = yt_dlp_command(
+    cookie_path,
+    &pot_provider_url,
+)
+    .arg("-v")
+    .arg("--no-playlist")
+    .arg("-o")
+    .arg(&output_file)
+    .arg("-f")
+    .arg(
+        "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+\
+         bestaudio[ext=m4a]"
+    )
+    .arg("--merge-output-format")
+    .arg("mp4")
+    .arg("--postprocessor-args")
+    .arg("ffmpeg:-movflags +faststart")
+    .arg(url)
+    .output()
+    .await?;
+
+let output = if high_quality.status.success() {
+    high_quality
+} else {
+    eprintln!(
+        "720p download failed, falling back to format 18:\n{}",
+        String::from_utf8_lossy(&high_quality.stderr)
+    );
+
+    // Remove any partial files left by failed attempt
+    let _ = tokio::fs::remove_file(&output_file).await;
+    let _ = tokio::fs::remove_file(format!("{}.part", &output_file)).await;
+
+    yt_dlp_command(
         cookie_path,
         &pot_provider_url,
     )
@@ -243,19 +276,13 @@ pub async fn download_video_upload_s3(
         .arg("-o")
         .arg(&output_file)
         .arg("-f")
-        .arg(
-            "best[height<=720][protocol*=m3u8]/\
-            bestvideo[height<=720][protocol*=m3u8]+bestaudio[protocol*=m3u8]/\
-            best[height<=720]/\
-            18"
-        )
-        .arg("--merge-output-format")
-        .arg("mp4")
+        .arg("18")
         .arg("--postprocessor-args")
         .arg("ffmpeg:-movflags +faststart")
         .arg(url)
         .output()
-        .await?;
+        .await?
+};
 
     println!(
         "yt-dlp stdout:\n{}",
