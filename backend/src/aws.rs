@@ -242,20 +242,10 @@ let high_quality = yt_dlp_command(
     .arg("--no-playlist")
     .arg("-o")
     .arg(&output_file)
-
-    // Default selector:
-    // bestvideo + bestaudio
     .arg("-f")
     .arg("bv*+ba/b")
-
-    // Prefer:
-    // H264
-    // highest FPS
-    // resolution <= 720p
-    // M4A audio
     .arg("-S")
-    .arg("vcodec:h264,fps,res:720,acodec:m4a")
-
+    .arg("res:720,br")
     .arg("--merge-output-format")
     .arg("mp4")
     .arg("--postprocessor-args")
