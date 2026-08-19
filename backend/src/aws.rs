@@ -145,7 +145,7 @@ fn yt_dlp_command(
     cmd.arg("--cookies")
         .arg(cookie_path)
         .arg("--extractor-args")
-        .arg("youtube:player_client=mweb")
+        .arg("youtube:player_client=mweb,web_safari")
         .arg("--extractor-args")
         .arg(format!(
             "youtubepot-bgutilhttp:base_url={}",
@@ -244,10 +244,9 @@ pub async fn download_video_upload_s3(
         .arg(&output_file)
         .arg("-f")
         .arg(
-            "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+\
-            bestaudio[ext=m4a]/\
-            best[ext=mp4][height<=720]/\
-            best[height<=720]"
+            "bestvideo[height<=720][protocol*=m3u8]+bestaudio[protocol*=m3u8]/\
+            best[height<=720][protocol*=m3u8]/\
+            18"
         )
         .arg("--merge-output-format")
         .arg("mp4")
