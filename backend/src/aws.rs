@@ -242,11 +242,20 @@ let high_quality = yt_dlp_command(
     .arg("--no-playlist")
     .arg("-o")
     .arg(&output_file)
+
+    // Default selector:
+    // bestvideo + bestaudio
     .arg("-f")
-    .arg(
-        "bestvideo[ext=mp4][vcodec^=avc1][height<=720]+\
-         bestaudio[ext=m4a]"
-    )
+    .arg("bv*+ba/b")
+
+    // Prefer:
+    // H264
+    // highest FPS
+    // resolution <= 720p
+    // M4A audio
+    .arg("-S")
+    .arg("vcodec:h264,fps,res:720,acodec:m4a")
+
     .arg("--merge-output-format")
     .arg("mp4")
     .arg("--postprocessor-args")
@@ -259,11 +268,10 @@ let output = if high_quality.status.success() {
     high_quality
 } else {
     eprintln!(
-        "720p download failed, falling back to format 18:\n{}",
+        "High-quality download failed, falling back to 360p:\n{}",
         String::from_utf8_lossy(&high_quality.stderr)
     );
 
-    // Remove any partial files left by failed attempt
     let _ = tokio::fs::remove_file(&output_file).await;
     let _ = tokio::fs::remove_file(format!("{}.part", &output_file)).await;
 
